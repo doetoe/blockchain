@@ -22,4 +22,4 @@ doetoe@protonmail.com
 
 ### Credits ###
 
-The initial inspiration came from [ https://bigishdata.com/2017/10/17/write-your-own-blockchain-part-1-creating-storing-syncing-displaying-mining-and-proving-work/ ](this tutorial).
+The initial inspiration came from [this tutorial](https://bigishdata.com/2017/10/17/write-your-own-blockchain-part-1-creating-storing-syncing-displaying-mining-and-proving-work/).
