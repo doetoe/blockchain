@@ -15,12 +15,12 @@ tracker.registered_peers = {}
 @tracker.route('/peers', methods=['GET'])
 def peers():
     """
-    Returns a list of registered peers. 
-    At this time they are simply identified by the 
-    presence of a subdirectory whose name is the port number, and what is 
-    returned are the port numbers as a list of strings.
+    Returns a list of registered peers in the form of a json list of complete
+    internet URL's, e.g. http://hostname.com:5001. 
     It will also get rid of peers whose lease time has passed (rather than
     have that done in a separate thread).
+    Note: in reality it returns a list with the strings which clients called
+    /register with. Peers expect these to be URL's.
     """
     now = time.time()
     tracker.registered_peers = \

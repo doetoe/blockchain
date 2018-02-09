@@ -91,20 +91,6 @@ class BlockChain(object):
 
     def __ne__(self, other):
         return not self == other
-      
-    # def add_block(self, new_block):
-    #     """
-    #     Put the new block into the index that the block is asking.
-    #     That is, if the index is of one that currently exists, the new block
-    #     would take it's place. Then we want to see if that block is valid.
-    #     If it isn't, then we ditch the new block and return False.
-    #     """
-    #     if new_block.index > len(self):
-    #         pass
-    #     self.blocks.append(new_block)
-
-    # def block_list_dict(self):
-    #     return [b.__dict__ for b in self.blocks]
 
     def mine(self, difficulty, intents=1000):
         """Try to mine a next block for the given difficulty by computing 
@@ -117,7 +103,7 @@ class BlockChain(object):
         returned.
         """
         index = 0 if len(self) == 0 else self.head().index + 1
-        timestamp = datetime.datetime.now().isoformat()
+        timestamp = datetime.datetime.utcnow().isoformat()
         data = "Block #%s" % (index)
         prev_hash = "" if len(self) == 0 else self.head().get_hash()
         block = Block(index=index, timestamp=timestamp,
