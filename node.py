@@ -71,14 +71,14 @@ def block():
         return block_file.read()
 
 def running(url):
-    address = "%s/running" % url
+    address = "http://%s/running" % url
     try:
         return requests.get(address).text == "running"
     except:
         return False
 
 def chainlength(url):
-    address = "%s/chainlength" % url
+    address = "http://%s/chainlength" % url
     try:
         return int(requests.get(address).text)
     except:
@@ -93,7 +93,7 @@ def start_mining(host, port, difficulty, tracker_url, shared_dict):
     blockchain = BlockChain.load(data_dir=chaindata_dir)
     assert blockchain.is_valid(difficulty)
 
-    url = "http://%s:%d" % (host, port)
+    url = "%s:%d" % (host, port)
     while shared_dict["running"]: # stop mining when webserver is stopped
         # update registration in every iteration
         # If you only want to broadcast updated blocks, you could do this
@@ -120,7 +120,7 @@ def start_mining(host, port, difficulty, tracker_url, shared_dict):
                 address = "http://localhost:%s"
                 if chainlength(peer_url) > len(blockchain):
                     peer_blockchain = BlockChain.from_url(
-                        "%s/blockchain" % (peer_url))
+                        "http://%s/blockchain" % (peer_url))
                     if peer_blockchain.is_valid(difficulty) and \
                        len(peer_blockchain) > len(blockchain):
                         blockchain = peer_blockchain

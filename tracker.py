@@ -38,11 +38,11 @@ def difficulty():
 def register():
     tracker.registered_peers[request.args.get('url')] = time.time()
     
-@tracker.route('/unregister', methods=['GET'])
-def unregister():
-    peer = request.args.get('url')
-    if peer in tracker.registered_peers:
-        tracker.registered_peers.pop(peer)
+# @tracker.route('/unregister', methods=['GET'])
+# def unregister():
+#     peer = request.args.get('url')
+#     if peer in tracker.registered_peers:
+#         tracker.registered_peers.pop(peer)
     
 if __name__ == '__main__':
     args, remaining = getopt.getopt(sys.argv[1:], "H:p:h")
