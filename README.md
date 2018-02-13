@@ -31,7 +31,7 @@ The nodes support
 
 ### Dependencies ###
 
-All this runs in Python 3, though probably Python 2 should work as well, possibly with some minor changes. It uses the non-standard modules flask, crypto and dateutil.
+All this runs in Python 3, though probably Python 2 should work as well, possibly with some minor changes. It uses the non-standard modules flask, ecdsa and dateutil.
 
 ### Contact ###
 

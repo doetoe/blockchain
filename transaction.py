@@ -3,6 +3,8 @@
 import json
 from textwrap import dedent
 import uuid as uuid_module
+from address import verify_signature
+import block
 
 class Transaction(object):
     """
@@ -14,10 +16,13 @@ class Transaction(object):
     Only pass a uuid if this is a copy of an existing transaction, otherwise
     a new uuid will be automatically created.
 
-    >>> tx = Transaction("Satoshi", "Doetoe", 1.0, "S.", 0.01, "Test",
-    ...                  uuid="8f34b28ac96d48f1af0c05adfca9921d")
+    >>> from address import Address
+    >>> from_addr = Address()
+    >>> to_addr = Address()
+    >>> tx = Transaction(from_addr.address, to_addr.address, 1.0, 0.01, "Test")
+    >>> tx.sign(from_addr)
     >>> print(Transaction.from_json(tx.as_json()))
-    id: 8f34b28ac96d48f1af0c05adfca9921d
+    id: ...
     1.0
     from: Satoshi
     to:   Doetoe
@@ -51,23 +56,27 @@ class Transaction(object):
     signature: S.
     """
     def __init__(self, from_addr, to_addr, amount,
-                 signature="", fee=0, msg="", uuid=None):
+                 fee=0, msg="", signature=None, uuid=None):
         self.from_addr = from_addr
         self.to_addr = to_addr
         self.amount = amount
         self.fee = fee
         self.msg = msg
+        # These should usually not be set
         self.signature = signature
         self.uuid = uuid or uuid_module.uuid4().hex # random 32 hex string
 
-    def sign(self, signature):
-        self.signature = signature
+    def sign(self, address):
+        """Sign the block with the specified Address. If you don't trust this
+        function, you can directly set self.signature to the signed version of
+        self.header()."""
+        self.signature = address.sign(self.header())
 
-    def validate(self):
+    def is_valid(self):
         """Check that the signature is equal to the string representation
         of the transaction encrypted with the private key associated to
         the from address."""
-        return validate(self.header(), self.signature, self.from_addr)
+        return verify_signature(self.header(), self.signature, self.from_addr)
     
     @staticmethod
     def from_json(s):
@@ -118,6 +127,9 @@ class TransactionBundle(object):
 
     def __iter__(self):
         return self.transactions.__iter__()
+
+def get_transaction_bundle(block):
+    return TransactionBundle.from_json(block.data)
     
 # execute doctest when executed as a script
 # Displays output when passed -v or when a test fails
