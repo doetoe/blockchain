@@ -24,6 +24,7 @@ import getopt
 mempool = Flask(__name__)
 mempool.transactions = {}
 
+# should be POST of several forms rather than a json?
 @mempool.route('/pushtx', methods=['GET'])
 def pushtx():
     mempool.transactions[
