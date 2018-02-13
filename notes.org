@@ -1,0 +1,10 @@
+* The emphasis is on readability and simplicity, not on performance or other optimizations. For example
+
+- When another miner generated a longer chain than you have, the full blockchain is downloaded from it, verified and then replaces the local one, rather than only downloading the required blocks, which would add the problem that the blockchain may get updated (even replaced) on the remote miner, etc.
+
+* To be done
+- better (shorter) public addresses, maybe like in the real bitcoin
+- tests
+- Inherit from Block to incorporate transactions, validation should (or might) involve checking for negative balances. New function to interpret data field as a TransactionBundle.
+- mempool
+- user/wallet/addresses etc
