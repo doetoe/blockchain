@@ -2,7 +2,7 @@
 
 import json
 from textwrap import dedent
-import uuid
+import uuid as uuid_module
 
 class Transaction(object):
     """
@@ -10,28 +10,55 @@ class Transaction(object):
     The message is any string, and the signature is the concatenation
     of from_addr, to_addr, amount, fee, msg, encrypted with the private key
     associated to the "from_addr" address.
-    Note that the signature
 
-    >>> tx = Transaction("Satoshi", "Doetoe", 1.0, "S.", "0.01", "Test")
+    Only pass a uuid if this is a copy of an existing transaction, otherwise
+    a new uuid will be automatically created.
+
+    >>> tx = Transaction("Satoshi", "Doetoe", 1.0, "S.", 0.01, "Test",
+    ...                  uuid="8f34b28ac96d48f1af0c05adfca9921d")
     >>> print(Transaction.from_json(tx.as_json()))
+    id: 8f34b28ac96d48f1af0c05adfca9921d
+    1.0
+    from: Satoshi
+    to:   Doetoe
+    fee:  0.01
+    Test
+    signature: S.
 
     >>> print(tx.header())
+    8f34b28ac96d48f1af0c05adfca9921d:Satoshi:Doetoe:1.0:0.01:Test
 
     >>> bundle = TransactionBundle(msg="A bundle of twice the same transaction",
     ...                            transactions=[tx, tx])
     >>> bundle = TransactionBundle.from_json(bundle.as_json())
-    >>> print bundle.msg
+    >>> print(bundle.msg)
+    A bundle of twice the same transaction
     >>> for tx in bundle:
-    ...     print tx
+    ...     print(tx)
+    id: 8f34b28ac96d48f1af0c05adfca9921d
+    1.0
+    from: Satoshi
+    to:   Doetoe
+    fee:  0.01
+    Test
+    signature: S.
+    id: 8f34b28ac96d48f1af0c05adfca9921d
+    1.0
+    from: Satoshi
+    to:   Doetoe
+    fee:  0.01
+    Test
+    signature: S.
     """
-    def __init__(self, from_addr, to_addr, amount, fee=0, msg=""):
-        self.from_adr = from_addr
+    def __init__(self, from_addr, to_addr, amount,
+                 signature="", fee=0, msg="", uuid=None):
+        self.from_addr = from_addr
         self.to_addr = to_addr
         self.amount = amount
         self.fee = fee
         self.msg = msg
-        self.signature = ""
-        self.uuid = uuid.uuid4().hex # random 32 hex string
+        self.signature = signature
+        self.uuid = uuid or uuid_module.uuid4().hex # random 32 hex string
 
     def sign(self, signature):
         self.signature = signature
@@ -40,7 +67,7 @@ class Transaction(object):
         """Check that the signature is equal to the string representation
         of the transaction encrypted with the private key associated to
         the from address."""
-        return decrypt(self.header(), self.from_addr).startswith(self.uuid)
+        return validate(self.header(), self.signature, self.from_addr)
     
     @staticmethod
     def from_json(s):
@@ -50,11 +77,11 @@ class Transaction(object):
         return json.dumps(self.__dict__)
 
     def header(self):
-        return "{0.uuid}:{0.from_addr}:{0.to_addr}:" \
-            + "{0.amount}:{0.fee}:{0.msg}:".format(self)
+        return ("{0.uuid}:{0.from_addr}:{0.to_addr}:" 
+                + "{0.amount}:{0.fee}:{0.msg}").format(self)
             
     def __str__(self):
-        return dedent("""
+        return dedent("""\
             id: {0.uuid}
             {0.amount}
             from: {0.from_addr}
@@ -76,7 +103,7 @@ class TransactionBundle(object):
         fields = json.loads(json_string)
         return TransactionBundle(
             msg=fields["msg"],
-            transactions=[Transaction(**json.loads(s))
+            transactions=[Transaction(**s)
                           for s in fields["transactions"]])
 
     def as_json(self):
