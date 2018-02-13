@@ -17,43 +17,38 @@ class Transaction(object):
     a new uuid will be automatically created.
 
     >>> from address import Address
-    >>> from_addr = Address()
-    >>> to_addr = Address()
-    >>> tx = Transaction(from_addr.address, to_addr.address, 1.0, 0.01, "Test")
-    >>> tx.sign(from_addr)
+    >>> addr1 = Address()
+    >>> addr2 = Address()
+    >>> tx = Transaction(addr1.address, addr2.address, 1.0, 0.01, "Test")
+    >>> tx.sign(addr1)
     >>> print(Transaction.from_json(tx.as_json()))
     id: ...
     1.0
-    from: Satoshi
-    to:   Doetoe
+    from: ...
+    to:   ...
     fee:  0.01
     Test
-    signature: S.
+    signature: ...
 
-    >>> print(tx.header())
-    8f34b28ac96d48f1af0c05adfca9921d:Satoshi:Doetoe:1.0:0.01:Test
+    >>> tx.is_valid()
+    True
 
-    >>> bundle = TransactionBundle(msg="A bundle of twice the same transaction",
-    ...                            transactions=[tx, tx])
+    >>> tx2 = Transaction(addr2.address, addr1.address, 0.5, 0.0, "Test2")
+    >>> tx2.is_valid()
+    False
+    >>> tx2.sign(addr1) # not the sender!
+    >>> tx2.is_valid()
+    False
+
+    >>> bundle = TransactionBundle(msg="A bundle of two transactions",
+    ...                            transactions=[tx, tx2])
     >>> bundle = TransactionBundle.from_json(bundle.as_json())
     >>> print(bundle.msg)
-    A bundle of twice the same transaction
+    A bundle of two transactions
     >>> for tx in bundle:
-    ...     print(tx)
-    id: 8f34b28ac96d48f1af0c05adfca9921d
-    1.0
-    from: Satoshi
-    to:   Doetoe
-    fee:  0.01
+    ...     print(tx.msg)
     Test
-    signature: S.
-    id: 8f34b28ac96d48f1af0c05adfca9921d
-    1.0
-    from: Satoshi
-    to:   Doetoe
-    fee:  0.01
-    Test
-    signature: S.
+    Test2
     """
     def __init__(self, from_addr, to_addr, amount,
                  fee=0, msg="", signature=None, uuid=None):
@@ -76,7 +71,8 @@ class Transaction(object):
         """Check that the signature is equal to the string representation
         of the transaction encrypted with the private key associated to
         the from address."""
-        return verify_signature(self.header(), self.signature, self.from_addr)
+        return self.signature is not None and \
+            verify_signature(self.header(), self.signature, self.from_addr)
     
     @staticmethod
     def from_json(s):
