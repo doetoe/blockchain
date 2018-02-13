@@ -16,7 +16,7 @@ tracker.registered_peers = {}
 def peers():
     """
     Returns a list of registered peers in the form of a json list of complete
-    internet URL's, e.g. http://hostname.com:5001. 
+    internet URL's (without protocol specifier), e.g. hostname.com:5001. 
     It will also get rid of peers whose lease time has passed (rather than
     have that done in a separate thread).
     Note: in reality it returns a list with the strings which clients called
@@ -56,8 +56,9 @@ if __name__ == '__main__':
         -H <host>   the host on which to run (default 127.0.0.1)
         -p <port>   the port on which to listen (default 5000)
 
-        Note that when host or port are set, the nodes must be informed, by setting the
-        right TRACKER_URL in config.py.
+        Note that when host or port are set, the nodes must be informed, 
+        by setting the right TRACKER_URL in config.py or passing the URL 
+        on the command line.
         """ % (os.path.basename(sys.argv[0])))
         sys.exit()
     host = args.get("-H", "127.0.0.1")

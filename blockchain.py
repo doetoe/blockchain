@@ -25,7 +25,7 @@ class BlockChain(object):
     # @staticmethod
     # def from_json(json_string):
     #     return BlockChain([Block(**s) for s in json.loads(json_string)])
-        
+    
     @staticmethod
     def from_url(url):
         """This function expects a url from which a json encoding a 
@@ -67,15 +67,6 @@ class BlockChain(object):
         for block in self.blocks:
             block.save(data_dir)
   
-    # def find_block_by_index(self, index):
-    #     return self.blocks[index]
-    # 
-    # def find_block_by_hash(self, hash):
-    #     for block in self.blocks:
-    #         if b.get_hash() == hash:
-    #             return block
-    #     return None
-
     def head(self):
         return None if len(self) == 0 else self.blocks[-1]
       
@@ -120,3 +111,24 @@ class BlockChain(object):
         """Extend the blockchain with a new block. It is not checked that 
         the blockchain is still valid"""
         self.blocks.append(block)
+
+    def pop(self):
+        return self.blocks.pop()
+        
+    def __getitem__(self, index): # index may be a slice
+        return self.blocks[index]
+
+    def __iter__(self):
+        return self.blocks.__iter__()
+        
+    def forkpoint(self, other):
+        """return n if the blockchains are different from node n onward 
+        (first n, numbered 0,...,n-1, are equal) or -1 if everywhere 
+        different"""
+        def _forkpoint(b1, b2, n):
+            return n if b1[0] != b2[0] else _forkpoint(b1[1:], b2[1:], n+1)
+        if self[0] != other[0]:
+            return -1
+        else:
+            return _forkpoint(self, other, 1)
+        

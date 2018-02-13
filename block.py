@@ -91,3 +91,12 @@ class Block(object):
     # Not needed in Python 3: __ne__ will call __eq__ if not implemented. In Python 2:
     # def __ne__(self, other):
     #     return not self == other
+
+# execute doctest when executed as a script
+# Displays output when passed -v or when a test fails
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod(optionflags=
+                    doctest.ELLIPSIS |
+                    doctest.NORMALIZE_WHITESPACE |
+                    doctest.IGNORE_EXCEPTION_DETAIL)
