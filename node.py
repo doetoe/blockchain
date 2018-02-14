@@ -117,7 +117,6 @@ def start_mining(host, port, difficulty, tracker_url, shared_dict):
             if peer_url == url: # the current node itself
                 continue
             try:
-                address = "http://localhost:%s"
                 if chainlength(peer_url) > len(blockchain):
                     peer_blockchain = BlockChain.from_url(
                         "http://%s/blockchain" % (peer_url))

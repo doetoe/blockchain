@@ -8,7 +8,7 @@ It stores, validates and updates the full blockchain, and keeps track of
 which block which transaction is in. On demand it can serve a list of
 unprocessed transactions.
 
-/pushtx(tx)       # or POST with several fields
+/pushtx(tx)       # post json
 /unprocessed      # json of all unprocessed transactions
 /balance(address)
 
@@ -20,16 +20,22 @@ import os
 import json
 import sys
 import getopt
+from transaction import Transaction
+from blockchain import BlockChain
 
 mempool = Flask(__name__)
-mempool.transactions = {}
+mempool.transactions = {} # key: transaction, value: block index
+mempool.blockchain = BlockChain()
 
-# should be POST of several forms rather than a json?
-@mempool.route('/pushtx', methods=['GET'])
+@mempool.route('/pushtx', methods=['PUT'])
 def pushtx():
-    mempool.transactions[
-        Transaction.from_json(request.args.get('tx').json())] = None
-
+    tx = Transaction.from_json(request.get_json())
+    if not tx in mempool.transactions:
+        mempool.transactions[tx] = None
+        return "received transaction %s" % (tx.uuid)
+    else:
+        return "duplicate transaction; ignoring"
+        
 @mempool.route('/unprocessed', methods=['GET'])
 def unprocessed():
     """
@@ -37,13 +43,42 @@ def unprocessed():
     of transaction contructor dictionaries. 
     """
     return json.dumps(list(transaction[0].__dict__
-                           for transaction in mempool.transactions
+                           for transaction in mempool.transactions.items()
                            if transaction[1] is None))
 
-@mempool.route('/balance', methods=['GET'])
-def balance():
-    address = request.args.get('tx').text
-    return "to be implemented"
+# def running
+# def chainlength
+# tracker_url
+# difficulty
+# 
+# def update_blockchain():  #### not needed: only update_transactions
+#     # download/update blockchain
+#     longest_blockchain = mempool.blockchain
+#     try:
+#         peers = [url for url in
+#                  requests.get("%s/peers" % tracker_url).json()
+#                  if running(url)]
+#     except requests.ConnectionError:
+#         peers = []
+#     for peer_url in peers:
+#         try:
+#             if chainlength(peer_url) > len(longest_blockchain):
+#                 peer_blockchain = BlockChain.from_url(
+#                     "%s/blockchain" % (peer_url))
+#                 if len(peer_blockchain) > len(longest_blockchain) and \
+#                    peer_blockchain.is_valid(difficulty):
+#                     longest_blockchain = peer_blockchain
+#         except requests.ConnectionError:
+#             pass
+#     # update transaction pool
+#     mempool.blockchain = longest_blockchain
+# 
+# # TODO
+# @mempool.route('/balance', methods=['GET'])
+# def balance():
+#     update_blockchain()
+#     address = request.args.get('address').text
+#     return mempool.blockchain()
     
 if __name__ == '__main__':
     args, remaining = getopt.getopt(sys.argv[1:], "H:p:h")

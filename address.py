@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 from ecdsa import SigningKey, VerifyingKey, NIST192p, BadSignatureError
+from ecdsa.util import randrange_from_seed__trytryagain
 import os
 from config import CURVE
 # from transaction import Transaction
@@ -27,8 +28,8 @@ class Address(object):
         if signing_key:
             self.signing_key = signing_key
         elif seed:
-            secret_exp = randrange_from_seed__trytryagain(seed, curve.order)
-            self.signing_key = SigningKey.from_secret_exponent(secexp, curve=CURVE)
+            secret_exp = randrange_from_seed__trytryagain(seed, CURVE.order)
+            self.signing_key = SigningKey.from_secret_exponent(secret_exp, curve=CURVE)
         else:
             self.signing_key = SigningKey.generate(curve=CURVE)
 
