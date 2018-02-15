@@ -34,26 +34,26 @@ The third level adds general purpose executable data to this. This is still very
 
 * For each miner you want to run, execute node.py as a script.
 
-  This will start mining and also connects to the tracker to discover other miners and synchronize with them.
+    This will start mining and also connects to the tracker to discover other miners and synchronize with them.
 
-  The nodes support
+    The nodes support
   
-  * /running      - returns running when the node is running
-  * /block(n)     - returns block n in json format
-  * /blockchain   - returns the blockchain as seen by this peer in json format
-  * /chainlength  - returns the chainlength as seen by this peer
+    * /running      - returns running when the node is running
+    * /block(n)     - returns block n in json format
+    * /blockchain   - returns the blockchain as seen by this peer in json format
+    * /chainlength  - returns the chainlength as seen by this peer
 
-  Unless the tracker and all miners run on the same computer, you have to specify hostnames and ports, call both with -h to see options.
+    Unless the tracker and all miners run on the same computer, you have to specify hostnames and ports, call both with -h to see options.
 
 For transaction management, additionally
 
 * run mempool.py as a script
 
-  The mempool supports
+    The mempool supports
 
-  * /pushtx(tx)       - put json describing a transaction
-  * /unprocessed      - json of all unprocessed transactions
-  * /balance(address) - the balance for this address. Optionally can specify whether to
+    * /pushtx(tx)       - put json describing a transaction
+    * /unprocessed      - json of all unprocessed transactions
+    * /balance(address) - the balance for this address. Optionally can specify whether to
                         include unconfirmed transactions using unconfirmed=true.
 
 * run user.py as a script for each transaction you want to post.
