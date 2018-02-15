@@ -16,87 +16,152 @@ Later (if needed) /whichblock(txid)
 """
 
 from flask import Flask, request
+import sqlite3
 import os
 import json
 import sys
 import getopt
+from config import TRACKER_ADDRESS, MEMPOOL_ADDRESS, DIFFICULTY
 from transaction import Transaction
 from blockchain import BlockChain
+from node import running, chainlength
 
 mempool = Flask(__name__)
-mempool.transactions = {} # key: transaction, value: block index
 mempool.blockchain = BlockChain()
+mempool.transactions = None # sqlite3.connect("")
 
 @mempool.route('/pushtx', methods=['PUT'])
 def pushtx():
     tx = Transaction.from_json(request.get_json())
-    if not tx in mempool.transactions:
-        mempool.transactions[tx] = None
+    if not tx.is_valid():
+        return "Invalid transaction; ignoring"
+    if not exists(tx, mempool.transactions):
+        insert(tx, mempool.transactions)
         return "received transaction %s" % (tx.uuid)
     else:
         return "duplicate transaction; ignoring"
-        
+
+def exists(tx, db):
+    c = db.execute(
+        "select count(*) from transactions where uuid=%s;", (tx.uuid,))
+    return c.fetchone()[0] != 0
+    
+def insert(tx, db):
+    db.execute(
+        """insert into transactions values 
+           (:uuid, :from_addr, :to_addr, :amount, :fee, :msg, :signature)""",
+        tx.__dict__)
+    db.commit()
+
+def unprocessed(db):
+    c = db.execute(
+        """select uuid, from_addr, to_addr, amount, fee, msg, signature 
+           from transactions where block = NULL""")
+    return [Transaction(
+        **dict(zip(["uuid", "from_addr", "to_addr",
+                    "amount", "fee", "msg", "signature"], data))) for data in c]
+    
 @mempool.route('/unprocessed', methods=['GET'])
 def unprocessed():
     """
     Returns a list of unprocessed transactions in the form of a json list 
     of transaction contructor dictionaries. 
     """
+    update_blockchain()
     return json.dumps(list(transaction[0].__dict__
-                           for transaction in mempool.transactions.items()
-                           if transaction[1] is None))
+                           for transaction in unprocessed(mempool.transactions)))
 
-# def running
-# def chainlength
-# tracker_url
-# difficulty
-# 
-# def update_blockchain():  #### not needed: only update_transactions
-#     # download/update blockchain
-#     longest_blockchain = mempool.blockchain
-#     try:
-#         peers = [url for url in
-#                  requests.get("%s/peers" % tracker_url).json()
-#                  if running(url)]
-#     except requests.ConnectionError:
-#         peers = []
-#     for peer_url in peers:
-#         try:
-#             if chainlength(peer_url) > len(longest_blockchain):
-#                 peer_blockchain = BlockChain.from_url(
-#                     "%s/blockchain" % (peer_url))
-#                 if len(peer_blockchain) > len(longest_blockchain) and \
-#                    peer_blockchain.is_valid(difficulty):
-#                     longest_blockchain = peer_blockchain
-#         except requests.ConnectionError:
-#             pass
-#     # update transaction pool
-#     mempool.blockchain = longest_blockchain
-# 
-# # TODO
-# @mempool.route('/balance', methods=['GET'])
-# def balance():
-#     update_blockchain()
-#     address = request.args.get('address').text
-#     return mempool.blockchain()
+def update_blockchain():
+    """Update the locally stored version of the blockchain by querying the nodes
+    and update the database from it."""
+    # download/update blockchain
+    longest_blockchain = mempool.blockchain
+    try:
+        nodes = [url for url in
+                 requests.get("%s/nodes" % mempool.tracker_url).json()
+                 if running(url)]
+    except requests.ConnectionError:
+        nodes = []
+    for node_url in nodes:
+        try:
+            if chainlength(node_url) > len(longest_blockchain):
+                node_blockchain = BlockChain.from_url(
+                    "%s/blockchain" % (node_url))
+                if len(node_blockchain) > len(longest_blockchain) and \
+                   node_blockchain.is_valid(DIFFICULTY):
+                    longest_blockchain = node_blockchain
+        except requests.ConnectionError:
+            pass
+    # TODO
+    # update transaction pool (database). Could assume that the database is up to date w.r.t.
+    # the old blockchain and only update for the newer blocks
+    mempool.blockchain = longest_blockchain
+
+@mempool.route('/balance', methods=['GET'])
+def balance():
+    update_blockchain()
+    address = request.args.get('address').text
+    # None if not available
+    if request.args.get('unconfirmed').text != "true":
+        extra_where = " and not block is NULL"
+    else:
+        extra_where = ""
+    # Better from BlockChain or from database?
+    received = mempool.transactions.execute(
+        "select sum(amount) from transactions where to_addr=?%s;" % extra_where,
+        (tx.to_addr,)).fetchone()[0]
+    transferred = mempool.transactions.execute(
+        "select sum(amount) - sum(fee) from transactions where from_addr=?%s;" % extra_where,
+        (tx.from_addr,)).fetchone()[0]
+    return received - transferred
     
 if __name__ == '__main__':
-    args, remaining = getopt.getopt(sys.argv[1:], "H:p:h")
-    args = dict(args)
-    if "-h" in args:
+    opt, remaining = getopt.getopt(sys.argv[1:], "hm:t:d:")
+    opt = dict(opt)
+    if "-h" in opt:
         print("""Usage: 
-        %s [options]
+        {0.scriptname} [options]
 
         Options:
-        -h          show this help
-        -H <host>   the host on which to run (default 127.0.0.1)
-        -p <port>   the port on which to listen (default 5100)
+        -h            show this help
+        -m <address>  the address (mempool address) on which to run (default {0.mempool})
+        -t <address>  the tracker address (default {0.tracker})
+        -d <db>       transaction database (default transactions.db)
 
         Note that when host or port are set, the users must be informed, 
-        by setting the right MEMPOOL_URL in config.py or passing the URL
+        by setting the right MEMPOOL_ADDRESS in config.py or passing the URL
         on the command line.
-        """ % (os.path.basename(sys.argv[0])))
+        """.format({"scriptname": os.path.basename(sys.argv[0]),
+                    "mempool": MEMPOOL_ADDRESS,
+                    "tracker": TRACKER_ADDRESS}))
         sys.exit()
-    host = args.get("-H", "127.0.0.1")
-    port = int(args.get("-p", 5100))
+
+    tracker_address = opt.get("-t", TRACKER_ADDRESS)
+    mempool.tracker_url = "http://%s" % tracker_address
+    db = opt.get("-d", "transactions.db")
+    db_existed = os.path.isfile(db)
+    # will be created if it doesn't exist
+    mempool.transactions = sqlite3.connect(db)
+    if not db_existed:
+        mempool.transactions.execute("""
+        create table transactions
+        (uuid      varchar primary key not null,
+         from_addr varchar             not null,
+         to_addr   varchar             not null,
+         amount    real                not null,
+         fee       real                not null,
+         msg       varchar             not null,
+         signature varchar             not null,
+         block     int);""")
+
+    # The local blockchain is empty on startup: set all transactions to unprocessed (no blocks)
+    mempool.transactions.execute(
+        "update transactions set block = NULL")
+    mempool.transactions.commit()
+    # LATER: load blockchain and update database
+    # data_dir = os.path.join(CHAINDATA_DIR, "mempool")
+    # mempool.blockchain = BlockChain.load(data_dir).as_json()
+    
+    address = opt.get("-m", MEMPOOL_ADDRESS).split(":")
+    host, port = address[0], 80 if len(address) == 1 else int(address[1])        
     mempool.run(host=host, port=port)

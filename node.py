@@ -2,7 +2,7 @@
 
 from block import Block
 from blockchain import BlockChain
-from config import CHAINDATA_DIR, TRACKER_HOST, TRACKER_PORT
+from config import CHAINDATA_DIR, TRACKER_ADDRESS
 from util import port_is_free
 from flask import Flask, request, abort
 import requests
@@ -106,23 +106,23 @@ def start_mining(host, port, difficulty, tracker_url, shared_dict):
             # get validated
         print("Chain length = %d" % len(blockchain))
         try:
-            peers = [url for url in
-                     requests.get("%s/peers" % tracker_url).json()
+            nodes = [url for url in
+                     requests.get("%s/nodes" % tracker_url).json()
                      if running(url)]
-            # print(peers)
+            # print(nodes)
         except requests.ConnectionError:
-            peers = []
+            nodes = []
         updated = False # to avoid unnecessary disk operations
-        for peer_url in peers:
-            if peer_url == url: # the current node itself
+        for node_url in nodes:
+            if node_url == url: # the current node itself
                 continue
             try:
-                if chainlength(peer_url) > len(blockchain):
-                    peer_blockchain = BlockChain.from_url(
-                        "http://%s/blockchain" % (peer_url))
-                    if peer_blockchain.is_valid(difficulty) and \
-                       len(peer_blockchain) > len(blockchain):
-                        blockchain = peer_blockchain
+                if chainlength(node_url) > len(blockchain):
+                    node_blockchain = BlockChain.from_url(
+                        "http://%s/blockchain" % (node_url))
+                    if node_blockchain.is_valid(difficulty) and \
+                       len(node_blockchain) > len(blockchain):
+                        blockchain = node_blockchain
                         updated = True
             except requests.ConnectionError:
                 pass
@@ -133,7 +133,7 @@ def start_mining(host, port, difficulty, tracker_url, shared_dict):
             blockchain.append(nextblock)
             blockchain.save(chaindata_dir)
             print("New block found: %s" % nextblock)
-    # This shouldn't be public, otherwise you could eliminate other peers
+    # This shouldn't be public, otherwise you could eliminate other nodes
     # requests.get("%s/unregister" % tracker_url, params={"url", str(port)})
     print("exiting")
             
@@ -141,9 +141,9 @@ def start_mining(host, port, difficulty, tracker_url, shared_dict):
 # port that is free, probably one that has run before if available.
 # It will at the same time start mining and start broadcasting.
 if __name__ == '__main__':
-    args, remaining = getopt.getopt(sys.argv[1:], "H:p:ht:P:")
-    args = dict(args)
-    if "-h" in args:
+    opt, remaining = getopt.getopt(sys.argv[1:], "H:p:ht:")
+    opt = dict(opt)
+    if "-h" in opt:
         print("""Usage: 
         %s [options]
 
@@ -151,16 +151,15 @@ if __name__ == '__main__':
         -h            show this help
         -H <host>     the host on which to run (default 127.0.0.1)
         -p <port>     the port on which to listen (default the first available one after 5000)
-        -t <tracker>  the hostname of the tracker, default localhost
-        -P <port>     the port of the tracker, default 5000
-        """ % (os.path.basename(sys.argv[0])))
+        -t <address>  the tracker address, default %s
+        """ % (os.path.basename(sys.argv[0]), TRACKER_ADDRESS))
         sys.exit()
     
-    host = args.get("-H", "127.0.0.1")
-    tracker_url = "http://%s:%s" % (args.get("-t", TRACKER_HOST), args.get("-P", TRACKER_PORT))
+    host = opt.get("-H", "127.0.0.1")
+    tracker_url = "http://%s" % (opt.get("-t", TRACKER_ADDRESS))
     
-    if "-p" in args:
-        port = int(args["-p"])
+    if "-p" in opt:
+        port = int(opt["-p"])
         if not port_is_free(port):
             raise RuntimeError("Port %d is already in use" % port)
     else: 

@@ -120,9 +120,14 @@ class TransactionBundle(object):
     def __iter__(self):
         return self.transactions.__iter__()
 
+# Special functions to treat a general block (with a generic data field) as a block
+# containing transactions.
 def get_transaction_bundle(block):
     return TransactionBundle.from_json(block.data)
-    
+
+def get_balance(blockchain, address):
+    raise NotImplementedError()
+
 # execute doctest when executed as a script
 # Displays output when passed -v or when a test fails
 if __name__ == "__main__":
