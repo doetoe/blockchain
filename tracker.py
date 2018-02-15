@@ -7,10 +7,14 @@ import sys
 import time
 import getopt
 
-from config import DIFFICULTY, LEASE_TIME, TRACKER_ADDRESS
+from config import LEASE_TIME, TRACKER_ADDRESS
 
 tracker = Flask(__name__)
 tracker.registered_nodes = {}
+
+@tracker.route('/running', methods=['GET'])
+def running():
+    return "running"    
 
 @tracker.route('/nodes', methods=['GET'])
 def nodes():
@@ -28,11 +32,11 @@ def nodes():
              now - node[1] < LEASE_TIME)
     return json.dumps(list(tracker.registered_nodes.keys()))
 
-@tracker.route('/difficulty', methods=['GET'])
-def difficulty():
-    """This should not really come from the tracker. It only depends on the
-    blockchain."""
-    return str(DIFFICULTY)
+# @tracker.route('/difficulty', methods=['GET'])
+# def difficulty():
+#     """This should not really come from the tracker. It only depends on the
+#     blockchain."""
+#     return str(DIFFICULTY)
 
 @tracker.route('/register', methods=['GET'])
 def register():

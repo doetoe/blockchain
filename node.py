@@ -2,7 +2,7 @@
 
 from block import Block
 from blockchain import BlockChain
-from config import CHAINDATA_DIR, TRACKER_ADDRESS
+from config import DIFFICULTY, CHAINDATA_DIR, TRACKER_ADDRESS
 from util import port_is_free
 from flask import Flask, request, abort
 import requests
@@ -71,6 +71,7 @@ def block():
         return block_file.read()
 
 def running(url):
+    """Both node and tracker provide this service."""
     address = "http://%s/running" % url
     try:
         return requests.get(address).text == "running"
@@ -84,14 +85,14 @@ def chainlength(url):
     except:
         return -1
     
-def start_mining(host, port, difficulty, tracker_url, shared_dict):
+def start_mining(host, port, tracker_url, shared_dict):
     chaindata_dir = os.path.join(CHAINDATA_DIR, str(port))
     if not os.path.isdir(CHAINDATA_DIR):
         os.mkdir(CHAINDATA_DIR)
     if not os.path.isdir(chaindata_dir):
         os.mkdir(chaindata_dir)
     blockchain = BlockChain.load(data_dir=chaindata_dir)
-    assert blockchain.is_valid(difficulty)
+    assert blockchain.is_valid(DIFFICULTY)
 
     url = "%s:%d" % (host, port)
     while shared_dict["running"]: # stop mining when webserver is stopped
@@ -120,7 +121,7 @@ def start_mining(host, port, difficulty, tracker_url, shared_dict):
                 if chainlength(node_url) > len(blockchain):
                     node_blockchain = BlockChain.from_url(
                         "http://%s/blockchain" % (node_url))
-                    if node_blockchain.is_valid(difficulty) and \
+                    if node_blockchain.is_valid(DIFFICULTY) and \
                        len(node_blockchain) > len(blockchain):
                         blockchain = node_blockchain
                         updated = True
@@ -128,7 +129,7 @@ def start_mining(host, port, difficulty, tracker_url, shared_dict):
                 pass
         if updated:
             blockchain.save(chaindata_dir)
-        nextblock = blockchain.mine(difficulty, intents=1000)
+        nextblock = blockchain.mine(DIFFICULTY, intents=1000)
         if nextblock is not None:
             blockchain.append(nextblock)
             blockchain.save(chaindata_dir)
@@ -169,7 +170,7 @@ if __name__ == '__main__':
             port += 1
 
     try:
-        difficulty = int(requests.get("%s/difficulty" % tracker_url).text)
+        requests.get("%s/running" % tracker_url)
     except BaseException as e:
         raise ConnectionError(
             "Tracker not running at %s: %s. Set the correct location in config.py" \
@@ -180,7 +181,7 @@ if __name__ == '__main__':
     shared_dict = Manager().dict()
     shared_dict["running"] = True
 
-    miner = Process(target=start_mining, args=(host, port, difficulty, tracker_url, shared_dict))
+    miner = Process(target=start_mining, args=(host, port, tracker_url, shared_dict))
     miner.start()
     
     print ("running node on port %d" % port)

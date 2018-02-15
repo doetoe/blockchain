@@ -88,6 +88,8 @@ def update_blockchain():
             if chainlength(node_url) > len(longest_blockchain):
                 node_blockchain = BlockChain.from_url(
                     "%s/blockchain" % (node_url))
+                # TODO Check validity in terms of transactions (balance of each address
+                # is non-negative.
                 if len(node_blockchain) > len(longest_blockchain) and \
                    node_blockchain.is_valid(DIFFICULTY):
                     longest_blockchain = node_blockchain
@@ -97,7 +99,8 @@ def update_blockchain():
     # update transaction pool (database): mark/unmark blocks
     # Note that all existing transactions should in theory be in this database.
     # Could assume that the database is up to date w.r.t. the old blockchain and
-    # only update for the newer blocks
+    # only update for the newer blocks (on starting the mempool the validity will
+    # be initialized from the blockchain)
     mempool.blockchain = longest_blockchain
 
 @mempool.route('/balance', methods=['GET'])

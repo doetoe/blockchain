@@ -1,27 +1,62 @@
 # README #
 
-When tracker.py is executed as a script, it runs a (centralized) tracker that assists in peer discovery. 
-For each miner you want to run, execute node.py.
+The lowest level system consists of a network of nodes that mindlessly mine data blocks satisfying a proof-of-work and forming a blockchain, and synchronize these among each other. Since the main focus of this exercise is not in the networking details (for the moment), like peer discovery, block broadcasting, etc, there is a tracker that allows nodes to find each other.
 
-This will start mining and also connects to the tracker to discover other miners and synchronize with them.
+For this to works correctly you need the modules
 
-Unless the tracker and all miners run on the same computer, you have to specify hostnames and ports, call both with -h to see options.
+* block
+* blockchain
+* tracker
+* node
+* util
+* config
 
-### Supported Web Services ###
+The next level adds transactions to this. Users can generate private keys and addresses and send transaction to an additional kind of node called a *mempool*, representing the *global transaction mempool*. Nodes can pull unprocessed transactions from it an include them in their blocks. Note that they are still the same blocks, the same mining, the same blockchains, only now the data field is interpreted as containing a bundle of transactions, which are executed when they get validated in the blockchain. For inclusion the nodes should check for additional validity: balances are non-negative at any point in the blockchain.
 
-The tracker supports
+For transactions to work correctly, you need the additional modules
 
-* /peers           - returns a list of URL's of registered miners
-* /difficulty      - returns the present difficulty. In the future this should be a function
-                     of the blockchain, not a centralized value.
-* /register(url)   - register a url with the tracker
+* mempool
+* transaction
+* address
+* user
 
-The nodes support
+The third level adds general purpose executable data to this. This is still very much to be done and understood.
 
-* /running      - returns running when the node is running
-* /block(n)     - returns block n in json format
-* /blockchain   - returns the blockchain as seen by this peer in json format
-* /chainlength  - returns the chainlength as seen by this peer
+### Operation ###
+
+* Run tracker.py as a script. This runs a (centralized) tracker that assists in peer discovery. 
+
+  The tracker supports
+
+  * /running         - returns running when the tracker is running
+  * /nodes           - returns a list of URL's of registered miners
+  * /register(url)   - register a url with the tracker
+
+* For each miner you want to run, execute node.py as a script.
+
+  This will start mining and also connects to the tracker to discover other miners and synchronize with them.
+
+  The nodes support
+  
+  * /running      - returns running when the node is running
+  * /block(n)     - returns block n in json format
+  * /blockchain   - returns the blockchain as seen by this peer in json format
+  * /chainlength  - returns the chainlength as seen by this peer
+
+  Unless the tracker and all miners run on the same computer, you have to specify hostnames and ports, call both with -h to see options.
+
+For transaction management, additionally
+
+* run mempool.py as a script
+
+  The mempool supports
+
+  * /pushtx(tx)       - put json describing a transaction
+  * /unprocessed      - json of all unprocessed transactions
+  * /balance(address) - the balance for this address. Optionally can specify whether to
+                        include unconfirmed transactions using unconfirmed=true.
+
+* run user.py as a script for each transaction you want to post.
 
 ### Objectives ###
 
@@ -31,7 +66,7 @@ The nodes support
 
 ### Dependencies ###
 
-All this runs in Python 3, though probably Python 2 should work as well, possibly with some minor changes. It uses the non-standard modules flask, ecdsa and dateutil.
+All this runs in Python 3, though probably Python 2 should work as well with some minor changes. It uses the non-standard modules flask, ecdsa and dateutil.
 
 ### Contact ###
 

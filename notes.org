@@ -5,9 +5,19 @@
 - all unprocessed transactions are served rather than just some number
 
 * To be done
-- user/wallet/addresses etc - not important, skip
-- balance: allow incomplete address
+- Wallet class, AddressBook etc - not important, skip
+- balance: allow incomplete address (prefix, as long as it is unique)
 - blocks of transactions
+- In validity check of blockchains containing transactions make sure that the balance is never negative. New function in transaction.py
+- Good tests for web services
+- For transactions we may want to subclass or change Node (or rather some component it has, like a BlockValidator, or maybe the BlockChain itself) for another step to check for the validity of blocks. Moreover the node will have to assemble transaction bundles. Maybe another component: BlockDataCollector or similar.
 
 * Robustness
-- nodes and mempool 
+- nodes and mempool continue working if the tracker is down.
+
+* Operation
+- Start the tracker. 
+- Start one or more nodes. These will start mining and synchronizing. If the tracker goes down, they will keep mining (and trying to connect and broadcast/synchronize).
+- Start the mempool
+- Send transactions to the mempool
+- Nodes pull transactions from the mempool to include in their blocks.
