@@ -14,6 +14,17 @@ def verify_signature(msg, signature, address):
     except BadSignatureError:
         return False
 
+def could_be_valid_address(s):
+    """Returns whether the string could represent a valid address:
+    - length at least 80
+    - hexadecimal format
+    """
+    try:
+        int(s,16)
+        return len(s) >= 80
+    except:
+        return False
+
 class Address(object):
     """
     >>> a = Address()
@@ -22,6 +33,11 @@ class Address(object):
     True
     >>> verify_signature('hello', s, a.address)
     False
+
+    When a signing_key is passed to the constructor, the address for that key
+    is generated.
+    When a (numerical) seed is passed, that will be used to deterministically
+    create an address.
     """
     def __init__(self, seed=None, signing_key=None):
         assert seed is None or signing_key is None

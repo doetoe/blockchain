@@ -21,6 +21,7 @@ import os
 import json
 import sys
 import getopt
+import requests
 from config import TRACKER_ADDRESS, MEMPOOL_ADDRESS, DIFFICULTY
 from transaction import Transaction
 from blockchain import BlockChain
@@ -43,20 +44,20 @@ def pushtx():
 
 def exists(tx, db):
     c = db.execute(
-        "select count(*) from transactions where uuid=%s;", (tx.uuid,))
+        "select count(*) from transactions where uuid=?;", (tx.uuid,))
     return c.fetchone()[0] != 0
     
 def insert(tx, db):
     db.execute(
         """insert into transactions values 
-           (:uuid, :from_addr, :to_addr, :amount, :fee, :msg, :signature)""",
+           (:uuid, :from_addr, :to_addr, :amount, :fee, :msg, :signature, NULL)""",
         tx.__dict__)
     db.commit()
 
-def unprocessed(db):
+def get_unprocessed(db):
     c = db.execute(
         """select uuid, from_addr, to_addr, amount, fee, msg, signature 
-           from transactions where block = NULL""")
+           from transactions where block is NULL""")
     return [Transaction(
         **dict(zip(["uuid", "from_addr", "to_addr",
                     "amount", "fee", "msg", "signature"], data))) for data in c]
@@ -68,8 +69,8 @@ def unprocessed():
     of transaction contructor dictionaries. 
     """
     update_blockchain()
-    return json.dumps(list(transaction[0].__dict__
-                           for transaction in unprocessed(mempool.transactions)))
+    return json.dumps(list(transaction.__dict__
+                           for transaction in get_unprocessed(mempool.transactions)))
 
 def update_blockchain():
     """Update the locally stored version of the blockchain by querying the nodes
@@ -93,47 +94,53 @@ def update_blockchain():
         except requests.ConnectionError:
             pass
     # TODO
-    # update transaction pool (database). Could assume that the database is up to date w.r.t.
-    # the old blockchain and only update for the newer blocks
+    # update transaction pool (database): mark/unmark blocks
+    # Note that all existing transactions should in theory be in this database.
+    # Could assume that the database is up to date w.r.t. the old blockchain and
+    # only update for the newer blocks
     mempool.blockchain = longest_blockchain
 
 @mempool.route('/balance', methods=['GET'])
 def balance():
     update_blockchain()
-    address = request.args.get('address').text
+    address = request.args.get('address')
     # None if not available
-    if request.args.get('unconfirmed').text != "true":
-        extra_where = " and not block is NULL"
+    if request.args.get('unconfirmed', 'false') != "true":
+        extra_where = " and block is not NULL"
     else:
         extra_where = ""
     # Better from BlockChain or from database?
     received = mempool.transactions.execute(
         "select sum(amount) from transactions where to_addr=?%s;" % extra_where,
-        (tx.to_addr,)).fetchone()[0]
+        (address,)).fetchone()[0]
     transferred = mempool.transactions.execute(
-        "select sum(amount) - sum(fee) from transactions where from_addr=?%s;" % extra_where,
-        (tx.from_addr,)).fetchone()[0]
-    return received - transferred
+        "select sum(amount) + sum(fee) from transactions where from_addr=?%s;" % extra_where,
+        (address,)).fetchone()[0]
+    if received is None:
+        received = 0
+    if transferred is None:
+        transferred = 0
+    return str(received - transferred)
     
 if __name__ == '__main__':
     opt, remaining = getopt.getopt(sys.argv[1:], "hm:t:d:")
     opt = dict(opt)
     if "-h" in opt:
         print("""Usage: 
-        {0.scriptname} [options]
+        {scriptname} [options]
 
         Options:
         -h            show this help
-        -m <address>  the address (mempool address) on which to run (default {0.mempool})
-        -t <address>  the tracker address (default {0.tracker})
+        -m <address>  the address (mempool address) on which to run (default {mempool})
+        -t <address>  the tracker address (default {tracker})
         -d <db>       transaction database (default transactions.db)
 
         Note that when host or port are set, the users must be informed, 
         by setting the right MEMPOOL_ADDRESS in config.py or passing the URL
         on the command line.
-        """.format({"scriptname": os.path.basename(sys.argv[0]),
-                    "mempool": MEMPOOL_ADDRESS,
-                    "tracker": TRACKER_ADDRESS}))
+        """.format(scriptname=os.path.basename(sys.argv[0]),
+                   mempool=MEMPOOL_ADDRESS,
+                   tracker=TRACKER_ADDRESS))
         sys.exit()
 
     tracker_address = opt.get("-t", TRACKER_ADDRESS)

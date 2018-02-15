@@ -23,7 +23,7 @@ class Transaction(object):
     >>> tx.sign(addr1)
     >>> print(Transaction.from_json(tx.as_json()))
     id: ...
-    ...
+    amount: ...
     signature: ...
 
     >>> tx.is_valid()
@@ -83,12 +83,12 @@ class Transaction(object):
             
     def __str__(self):
         return dedent("""\
-            id: {0.uuid}
-            {0.amount}
-            from: {0.from_addr}
-            to:   {0.to_addr}
-            fee:  {0.fee}
-            {0.msg}
+            id:        {0.uuid}
+            amount:    {0.amount}
+            from:      {0.from_addr}
+            to:        {0.to_addr}
+            fee:       {0.fee}
+            msg:       {0.msg}
             signature: {0.signature}""".format(self))    
     
 class TransactionBundle(object):
