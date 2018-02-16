@@ -5,6 +5,10 @@
 - all unprocessed transactions are served rather than just some number
 
 * To be done
+- Inherit TransactionBlockChain from BlockChain to override the "mine" function. Maybe also the TransactionBlock. In mining, unprocessed transactions should be retrieved and bundled.
+- node uses BlockChain.load (static). This is the only thing that has to change for different BlockChain classes.
+- configuration file for the different networks: minimal_blocks, transaction_blocks, contract_blocks, etc. Note that this loads the data as a BlockChain of the appropriate class. If nodes for different networks are connected with the same tracker, they will get mixed up: better that the tracker also be configured in the same way and only accepts node for the same network (minimal, transaction, contract,...)
+- In node, tracker, mempool, better separate core functionality from network operations if possible (maybe in component classes)
 - Wallet class, AddressBook etc - not important, skip
 - balance: allow incomplete address (prefix, as long as it is unique)
 - blocks of transactions

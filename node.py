@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-from block import Block
 from blockchain import BlockChain
 from config import DIFFICULTY, CHAINDATA_DIR, TRACKER_ADDRESS
 from util import port_is_free
@@ -84,14 +83,16 @@ def chainlength(url):
         return int(requests.get(address).text)
     except:
         return -1
-    
-def start_mining(host, port, tracker_url, shared_dict):
+
+def start_mining(host, port, tracker_url, shared_dict, blockchain_loader):
+    """This is the main function, that executes in an infinite loop as long
+    as this node is running."""
     chaindata_dir = os.path.join(CHAINDATA_DIR, str(port))
     if not os.path.isdir(CHAINDATA_DIR):
         os.mkdir(CHAINDATA_DIR)
     if not os.path.isdir(chaindata_dir):
         os.mkdir(chaindata_dir)
-    blockchain = BlockChain.load(data_dir=chaindata_dir)
+    blockchain = blockchain_loader(data_dir=chaindata_dir)
     assert blockchain.is_valid(DIFFICULTY)
 
     url = "%s:%d" % (host, port)
@@ -173,15 +174,23 @@ if __name__ == '__main__':
         requests.get("%s/running" % tracker_url)
     except BaseException as e:
         raise ConnectionError(
-            "Tracker not running at %s: %s. Set the correct location in config.py" \
+            "Tracker not running at %s: %s." \
             % (tracker_url, type(e)) + \
-            "or pass it on the command line.")
+            "Specify the address on the command line if it doesn't " + \
+            "run at the default address %s." % (TRACKER_ADDRESS))
 
     # This generates a dictionary that can be shared between processes
     shared_dict = Manager().dict()
     shared_dict["running"] = True
 
-    miner = Process(target=start_mining, args=(host, port, tracker_url, shared_dict))
+    # This should be made dynamic: a function that returns a blockchain
+    # of the appropriate class
+    def blockchain_loader(data_dir):
+        return BlockChain.load(data_dir=data_dir)
+
+    miner = Process(
+        target=start_mining,
+        args=(host, port, tracker_url, shared_dict, blockchain_loader))
     miner.start()
     
     print ("running node on port %d" % port)
