@@ -22,9 +22,9 @@ For transactions to work correctly, you need the additional modules
 
 The third level adds general purpose executable data to this. This is still very much to be done and understood.
 
-### Operation ###
+## Operation ##
 
-##### Run tracker.py as a script. This runs a (centralized) tracker that assists in peer discovery. 
+#### Run tracker.py as a script. This runs a (centralized) tracker that assists in peer discovery. 
 
 The tracker supports
 
@@ -32,7 +32,7 @@ The tracker supports
 * /nodes           - returns a list of URL's of registered miners
 * /register(url)   - register a url with the tracker
 
-##### For each miner you want to run, execute node.py as a script.
+#### For each miner you want to run, execute node.py as a script.
 
 This will start mining and also connects to the tracker to discover other miners and synchronize with them.
 
@@ -45,7 +45,7 @@ The nodes support
 
 Unless the tracker and all miners run on the same computer, you have to specify hostnames and ports, call both with -h to see options.
 
-##### For transaction management, additionally run mempool.py as a script
+#### For transaction management, additionally run mempool.py as a script
 
 The mempool supports
 
@@ -55,20 +55,20 @@ The mempool supports
                         include unconfirmed transactions using unconfirmed=true.
 * run user.py as a script for each transaction you want to post.
 
-### Objectives ###
+## Objectives ##
 
 * To implement a toy blockchain to understand the concepts in some detail.
 * To provide a base for experimentation with variations and applications of blockchain technology.
 * The networking part (peer discovery, block broadcasting, security of communications, etc) is not the main focus, so this just has a quick 'n' dirty design. 
 
-### Dependencies ###
+## Dependencies ##
 
 All this runs in Python 3, though Python 2 should work with some minor changes. It uses the non-standard modules flask, ecdsa and dateutil.
 
-### Contact ###
+## Contact ##
 
 doetoe@protonmail.com
 
-### Credits ###
+## Credits ##
 
 The initial inspiration came from [this tutorial](https://bigishdata.com/2017/10/17/write-your-own-blockchain-part-1-creating-storing-syncing-displaying-mining-and-proving-work/).
