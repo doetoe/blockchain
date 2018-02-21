@@ -58,6 +58,9 @@ class Block(object):
         """Check that the proof-of-work is satisfied for this block."""
         return self.get_hash().startswith('0' * difficulty)
 
+    def is_valid(self):
+        return self.satisfies_pow()
+    
     def is_valid_predecessor(self, next_block):
         """
         x.is_valid_predecessor(y) if y is a valid successor of x:

@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 from blockchain import BlockChain
-from config import DIFFICULTY, CHAINDATA_DIR, TRACKER_ADDRESS
+from config import DIFFICULTY, CHAINDATA_DIR, TRACKER_ADDRESS, BLOCKCHAIN_CLASS
 from util import port_is_free
 from flask import Flask, request, abort
 import requests
@@ -37,7 +37,7 @@ def blockchain():
     """
     port = request.environ["SERVER_PORT"] # already is a string
     data_dir = os.path.join(CHAINDATA_DIR, port)
-    ret = BlockChain.load(data_dir).as_json()
+    ret = BLOCKCHAIN_CLASS.load(data_dir).as_json()
     return ret
 
 @node.route('/chainlength', methods=['GET'])
@@ -84,7 +84,7 @@ def chainlength(url):
     except:
         return -1
 
-def start_mining(host, port, tracker_url, shared_dict, blockchain_loader):
+def start_mining(host, port, tracker_url, shared_dict):
     """This is the main function, that executes in an infinite loop as long
     as this node is running."""
     chaindata_dir = os.path.join(CHAINDATA_DIR, str(port))
@@ -92,7 +92,7 @@ def start_mining(host, port, tracker_url, shared_dict, blockchain_loader):
         os.mkdir(CHAINDATA_DIR)
     if not os.path.isdir(chaindata_dir):
         os.mkdir(chaindata_dir)
-    blockchain = blockchain_loader(data_dir=chaindata_dir)
+    blockchain = BLOCKCHAIN_CLASS.load(data_dir=chaindata_dir)
     assert blockchain.is_valid(DIFFICULTY)
 
     url = "%s:%d" % (host, port)
@@ -120,7 +120,7 @@ def start_mining(host, port, tracker_url, shared_dict, blockchain_loader):
                 continue
             try:
                 if chainlength(node_url) > len(blockchain):
-                    node_blockchain = BlockChain.from_url(
+                    node_blockchain = BLOCKCHAIN_CLASS.from_url(
                         "http://%s/blockchain" % (node_url))
                     if node_blockchain.is_valid(DIFFICULTY) and \
                        len(node_blockchain) > len(blockchain):
@@ -183,14 +183,9 @@ if __name__ == '__main__':
     shared_dict = Manager().dict()
     shared_dict["running"] = True
 
-    # This should be made dynamic: a function that returns a blockchain
-    # of the appropriate class
-    def blockchain_loader(data_dir):
-        return BlockChain.load(data_dir=data_dir)
-
     miner = Process(
         target=start_mining,
-        args=(host, port, tracker_url, shared_dict, blockchain_loader))
+        args=(host, port, tracker_url, shared_dict))
     miner.start()
     
     print ("running node on port %d" % port)

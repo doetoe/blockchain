@@ -12,26 +12,32 @@ class BlockChain(object):
         self.blocks = blocks or []
 
     @staticmethod
-    def load(data_dir):
-        ret = BlockChain()
+    def new_block(*args, **kwargs):
+        """Contructs a block of a class compatible with this BlockChain class
+        with the specified arguments"""
+        return Block(*args, **kwargs)
+        
+    @classmethod
+    def load(cls, data_dir):
+        bchain = cls()
         if os.path.exists(data_dir):
             for filepath in glob.glob(os.path.join(data_dir, "*.json")):
                 with open(filepath, 'r') as block_file:
                     block_info = json.load(block_file)
-                    ret.append(Block(**block_info))
-        ret.blocks.sort(key=lambda b: int(b.index))
-        return ret
+                    bchain.append(bchain.new_block(**block_info))
+        bchain.blocks.sort(key=lambda b: int(b.index))
+        return bchain        
     
     # @staticmethod
     # def from_json(json_string):
     #     return BlockChain([Block(**s) for s in json.loads(json_string)])
     
-    @staticmethod
-    def from_url(url):
+    @classmethod
+    def from_url(cls, url):
         """This function expects a url from which a json encoding a 
         blockchain will be returned."""
         chaindata = requests.get(url).json()
-        return BlockChain([Block(**blockdata) for blockdata in chaindata])
+        return cls([cls.new_block(**blockdata) for blockdata in chaindata])
 
     def as_json(self):
         return json.dumps([block.__dict__ for block in self.blocks])
@@ -97,8 +103,8 @@ class BlockChain(object):
         timestamp = datetime.datetime.utcnow().isoformat()
         data = "Block #%s" % (index)
         prev_hash = "" if len(self) == 0 else self.head().get_hash()
-        block = Block(index=index, timestamp=timestamp,
-                      data=data, prev_hash=prev_hash, nonce=0)
+        block = self.new_block(index=index, timestamp=timestamp,
+                               data=data, prev_hash=prev_hash, nonce=0)
     
         for nonce in range(intents):
             block.nonce = nonce
@@ -131,4 +137,4 @@ class BlockChain(object):
             return -1
         else:
             return _forkpoint(self, other, 1)
-        
+

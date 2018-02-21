@@ -4,11 +4,14 @@ import json
 from textwrap import dedent
 import uuid as uuid_module
 from address import verify_signature
-import block
+from collections import defaultdict
+from block import Block
+from blockchain import BlockChain
+from config import BLOCK_REWARD
 
 class Transaction(object):
     """
-    from_addr and to_addr are public addresses. Signature and fee are floats. 
+    from_addr and to_addr are public addresses. Amount and fee are floats.
     The message is any string, and the signature is the concatenation
     of from_addr, to_addr, amount, fee, msg, encrypted with the private key
     associated to the "from_addr" address.
@@ -94,16 +97,26 @@ class Transaction(object):
 class TransactionBundle(object):
     """A package of transactions that can be stored in the data field 
     of a Block."""
-    def __init__(self, msg="", transactions=None):
+    def __init__(self, msg="", miner_address="", transactions=None):
+        """msg is a free text field, miner_address is an address where the
+        block reward and the fees should go to.
+        The rest are the transactions themselves."""
         self.msg = msg
+        self.miner_address = miner_address
         assert transactions is None or isinstance(transactions, list)
         self.transactions = transactions or []
 
+    # def get_balance(self, address):
+    #     """The change in the balance of the specified address due to transactions
+    #     in this block."""
+    #     raise NotImplementedError()
+    
     @staticmethod
     def from_json(json_string):
         fields = json.loads(json_string)
         return TransactionBundle(
             msg=fields["msg"],
+            miner_address=fields["miner_address"],
             transactions=[Transaction(**s)
                           for s in fields["transactions"]])
 
@@ -112,6 +125,7 @@ class TransactionBundle(object):
         of a block."""
         return json.dumps(
             {"msg": self.msg,
+             "miner_address": self.miner_address,
              "transactions": [tx.__dict__ for tx in self.transactions]})
 
     def __len__(self):
@@ -120,14 +134,54 @@ class TransactionBundle(object):
     def __iter__(self):
         return self.transactions.__iter__()
 
-# Special functions to treat a general block (with a generic data field) as a block
-# containing transactions.
-def get_transaction_bundle(block):
-    return TransactionBundle.from_json(block.data)
+# # Special functions to treat a general block (with a generic data field) as a block
+# # containing transactions.
+# def get_transaction_bundle(block):
+#     return TransactionBundle.from_json(block.data)
+# 
+# def get_balance(blockchain, address):
+#     raise NotImplementedError()
 
-def get_balance(blockchain, address):
-    raise NotImplementedError()
-
+class TransactionBlock(Block):
+    def get_transaction_bundle(self):
+        return TransactionBundle.from_json(self.data)
+    def set_transaction_bundle(self, txs):
+        self.data = txs.as_json()
+    
+class TransactionBlockChain(BlockChain):
+    def is_valid(self, difficulty):
+        # check balances and unicity of transactions
+        try:
+            self.get_balances()
+        except AssertionError:
+            return False
+        return super(TransactionBlockChain, self).is_valid()
+    def mine(self):
+        # get unprocessed transactions
+        # verify and bundle them into data field of a new block
+        # compute POW hash
+        raise NotImplementedError()
+    def get_balances(self):
+        """Returns a dictionary whose keys are all addresses appearing in the
+        blockchain (including the miner_address), and whose values are the 
+        balances."""
+        balances = defaultdict(lambda:0)
+        transaction_uuids = set()
+        for block in self:
+            txs = block.get_transaction_bundle()
+            for tx in txs:
+                assert not tx.uuid in transaction_uuids, \
+                    "Duplicate transaction in blockchain: %s" % tx.uuid
+                transaction_uuids.add(tx.uuid)
+                balances[tx.from_addr] -= (tx.fee + tx.amount)
+                balances[tx.to_addr] += tx.amount
+                balances[txx.miner_address] += (tx.fee + BLOCK_REWARD)
+            assert all([balance >= 0 for balance in balances.values()]), \
+                "Negative balances in block %d" % block.index
+        return balances
+    def get_balance(self, address):
+        return self.get_balances()[address]
+    
 # execute doctest when executed as a script
 # Displays output when passed -v or when a test fails
 if __name__ == "__main__":

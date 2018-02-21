@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-from ecdsa import SigningKey, VerifyingKey, NIST192p, BadSignatureError
+from ecdsa import SigningKey, VerifyingKey, BadSignatureError
 from ecdsa.util import randrange_from_seed__trytryagain
 import os
 from config import CURVE
@@ -8,6 +8,7 @@ from config import CURVE
 
 # address and signature are in hex format
 def verify_signature(msg, signature, address):
+    """Verify a signed message using a (public) address in hex format."""
     verifying_key = VerifyingKey.from_string(bytes.fromhex(address), curve=CURVE)
     try:
         return verifying_key.verify(bytes.fromhex(signature), msg.encode("utf-8"))
@@ -16,12 +17,12 @@ def verify_signature(msg, signature, address):
 
 def could_be_valid_address(s):
     """Returns whether the string could represent a valid address:
-    - length at least 80
+    - length 96 (possibly with leading zeros)
     - hexadecimal format
     """
     try:
         int(s,16)
-        return len(s) >= 80
+        return len(s) == 96
     except:
         return False
 
@@ -49,6 +50,7 @@ class Address(object):
         else:
             self.signing_key = SigningKey.generate(curve=CURVE)
 
+        # The next two fields depend only on the signing_key
         self.verifying_key = self.signing_key.get_verifying_key()
         # note that if instead of to_string() we would use to_der() 
         # or to_pem(), we could use different elliptic curves for different addresses

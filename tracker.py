@@ -41,6 +41,7 @@ def nodes():
 @tracker.route('/register', methods=['GET'])
 def register():
     tracker.registered_nodes[request.args.get('url')] = time.time()
+    return "%s registered" % request.args.get('url')
     
 # @tracker.route('/unregister', methods=['GET'])
 # def unregister():

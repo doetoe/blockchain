@@ -7,14 +7,15 @@
 * To be done
 - Inherit TransactionBlockChain from BlockChain to override the "mine" function. Maybe also the TransactionBlock. In mining, unprocessed transactions should be retrieved and bundled.
 - node uses BlockChain.load (static). This is the only thing that has to change (in node.py) for different BlockChain classes.
+- For transactions we may want to subclass or change Node (or rather some component it has, like a BlockValidator, or maybe the BlockChain itself) for another step to check for the validity of blocks. Moreover the node will have to assemble transaction bundles. Maybe another component: BlockDataCollector or similar. -> enough to just change the BlockChain.load
 - configuration file for the different networks: minimal_blocks, transaction_blocks, contract_blocks, etc. Note that this loads the data as a BlockChain of the appropriate class. If nodes for different networks are connected with the same tracker, they will get mixed up: better that the tracker also be configured in the same way and only accepts node for the same network (minimal, transaction, contract,...)
 - In node, tracker, mempool, better separate core functionality from network operations if possible (maybe in component classes)
 - Wallet class, AddressBook etc - not important
-- balance: allow incomplete address (prefix, as long as it is unique)
+- balance (user): allow incomplete address (prefix, as long as it is unique)
 - blocks of transactions
 - In validity check of blockchains containing transactions make sure that the balance is never negative. New function in transaction.py
 - Good tests for web services
-- For transactions we may want to subclass or change Node (or rather some component it has, like a BlockValidator, or maybe the BlockChain itself) for another step to check for the validity of blocks. Moreover the node will have to assemble transaction bundles. Maybe another component: BlockDataCollector or similar.
+- fees and block reward go to miner_address
 
 * Validity of a block
 - correct format
@@ -24,6 +25,7 @@
 - no duplicate transactions in whole chain
 - correct block reward
 - balance never below 0 for any address in the chain
+- timestamp
 
 * Robustness
 - nodes and mempool continue working if the tracker is down.

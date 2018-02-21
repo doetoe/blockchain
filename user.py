@@ -23,7 +23,6 @@ def showhelp(path):
           -s <seed>      the seed from which the address is deterministically generated
           -f <file>      the file from which the Address object can be read
                          Either seed or file must be specified.
-          -m <address>   mempool address (default {1})
           -M <msg>       a message to include in the transaction. 
           -F <fee>       optional transaction fee.
 
@@ -32,6 +31,11 @@ def showhelp(path):
           address, the address will be generated. If you pass a seed, make sure that
           it doesn't have the form resembling a valid address (namely a hex string of
           length >= 80).
+        
+        - address <seed>
+
+          print the (public) address associated to the seed
+
     """.format(os.path.basename(path), MEMPOOL_ADDRESS))
 
 if __name__ == "__main__":
@@ -40,13 +44,14 @@ if __name__ == "__main__":
         sys.exit()
         
     cmd = sys.argv[1]
+    
     if cmd == "send":
-        opt, remaining = getopt.getopt(sys.argv[2:], "s:f:H:m:M:F:")
+        opt, remaining = getopt.getopt(sys.argv[2:], "s:f:H:M:F:")
         opt = dict(opt)
         s,f = "-s" in opt, "-f" in opt
         assert len(remaining) == 2, "two arguments required: amount and address"
         assert s and not f or f and not s, \
-            "Have to specify either a seed or a file and not both"
+            "Have to specify either a seed or an address file and not both"
         amount = float(remaining[0])
         dest = remaining[1]
         if not could_be_valid_address(dest):
@@ -67,6 +72,9 @@ if __name__ == "__main__":
             print(tx)
         except requests.ConnectionError as e:
             print("Couldn't submit transaction: %s" % e)
+    elif cmd == "address":
+        opt, remaining = getopt.getopt(sys.argv[2:], "")
+        print(Address(seed=remaining[0]).address)
     else:
         print("Command '%s' not recognized" % cmd)
         sys.exit()
