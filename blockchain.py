@@ -60,6 +60,8 @@ class BlockChain(object):
         if self.blocks[0].index != 0:
             return False
         for (prev_block, block) in zip(self.blocks[:-1], self.blocks[1:]):
+            if not block.is_valid():
+                return False
             if not block.satisfies_pow(difficulty):
                 return False
             if not prev_block.is_valid_predecessor(block):

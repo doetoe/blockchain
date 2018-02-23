@@ -59,7 +59,12 @@ class Block(object):
         return self.get_hash().startswith('0' * difficulty)
 
     def is_valid(self):
-        return self.satisfies_pow()
+        """Validity as far as independent of its position in the blockchain.
+        Note that it is deliberately NOT checked that the proof-of-work is
+        satisfied, because even though in this implementation it really only
+        depends on the block, in reality and in future evolutions it depends
+        on the blockchain."""
+        return True # self.satisfies_pow(difficulty)
     
     def is_valid_predecessor(self, next_block):
         """

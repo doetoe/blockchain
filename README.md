@@ -20,6 +20,8 @@ For transactions to work correctly, you need the additional modules
 * address
 * user
 
+and you should change the configuration file `config.py` to specify the correct blockchain class.
+
 The third level adds general purpose executable data to this. This is still very much to be done and understood.
 
 ### Operation ###
@@ -51,8 +53,9 @@ The mempool supports
 
 * /pushtx(tx)       - put json describing a transaction
 * /unprocessed      - json of all unprocessed transactions
-* /balance(address) - the balance for this address. Optionally can specify whether to
-                        include unconfirmed transactions using unconfirmed=true.
+* /balance(address) - the balance for this address. Optionally can specify the number confirmations you want using confirmations=<n>.
+		      1 means transactions anywhere in the blockchain, 0 means including unprocessed transactions.
+* /confirmations(transaction_id)  - how many confirmations does the specified transaction have
 * run user.py as a script for each transaction you want to post.
 
 ### Objectives ###

@@ -30,7 +30,7 @@ def showhelp(path):
           address. If instead of an address a seed is passed for the generation of an
           address, the address will be generated. If you pass a seed, make sure that
           it doesn't have the form resembling a valid address (namely a hex string of
-          length >= 80).
+          length 96).
         
         - address <seed>
 

@@ -128,6 +128,9 @@ class TransactionBundle(object):
              "miner_address": self.miner_address,
              "transactions": [tx.__dict__ for tx in self.transactions]})
 
+    def is_valid(self):
+        return all(tx.is_valid() for tx in self)
+    
     def __len__(self):
         return len(self.blocks)
 
@@ -145,29 +148,42 @@ class TransactionBundle(object):
 class TransactionBlock(Block):
     def get_transaction_bundle(self):
         return TransactionBundle.from_json(self.data)
+    
     def set_transaction_bundle(self, txs):
         self.data = txs.as_json()
+        
+    def is_valid(self):
+        return super(TransactionBlock, self).is_valid() and \
+            self.get_transaction_bundle().is_valid()
+
     
 class TransactionBlockChain(BlockChain):
     def is_valid(self, difficulty):
-        # check balances and unicity of transactions
+        # check balances, validity and unicity of transactions
         try:
+            # raises AssertionError if positivity of balances and unicity
+            # of transactions is not satisfied
             self.get_balances()
         except AssertionError:
             return False
         return super(TransactionBlockChain, self).is_valid()
+    
     def mine(self):
         # get unprocessed transactions
         # verify and bundle them into data field of a new block
         # compute POW hash
         raise NotImplementedError()
-    def get_balances(self):
+    
+    def get_balances(self, confirmations=1):
         """Returns a dictionary whose keys are all addresses appearing in the
         blockchain (including the miner_address), and whose values are the 
-        balances."""
+        balances.
+        If a number of confirmations is passed, the balance is based only on
+        transactions that have the specified number of confirmations, default 1,
+        meaning anywhere in the chain (last block or earlier)."""
         balances = defaultdict(lambda:0)
         transaction_uuids = set()
-        for block in self:
+        for block in self[:len(self) - confirmations + 1]:
             txs = block.get_transaction_bundle()
             for tx in txs:
                 assert not tx.uuid in transaction_uuids, \
@@ -179,8 +195,9 @@ class TransactionBlockChain(BlockChain):
             assert all([balance >= 0 for balance in balances.values()]), \
                 "Negative balances in block %d" % block.index
         return balances
-    def get_balance(self, address):
-        return self.get_balances()[address]
+    
+    def get_balance(self, address, confirmations=0):
+        return self.get_balances(confirmations)[address]
     
 # execute doctest when executed as a script
 # Displays output when passed -v or when a test fails
