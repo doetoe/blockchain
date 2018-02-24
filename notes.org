@@ -6,6 +6,8 @@
 
 * To be done
 - Inherit TransactionBlockChain from BlockChain to override the "mine" function. Maybe also the TransactionBlock. In mining, unprocessed transactions should be retrieved and bundled.
+- The TransactionBlockChain in its "mine" function has to have access to the mempool address or obtain unprocessed transactions in a different way. The "Node" right now is generic, which is good, but it could be that it needs to be different for a node processing transactions than for one validating basic blocks, and again for one that processes contracts. 
+- Maybe integrate mempool in a general node (in some elegant, flexible, extensible and configurable way)
 - In node, tracker, mempool, better separate core functionality from network operations if possible (maybe in component classes)
 - Wallet class, AddressBook etc - not important
 - balance (user): allow incomplete address (prefix, as long as it is unique)

@@ -2,12 +2,13 @@
 
 import json
 from textwrap import dedent
+import requests
 import uuid as uuid_module
 from address import verify_signature
 from collections import defaultdict
 from block import Block
 from blockchain import BlockChain
-from config import BLOCK_REWARD
+from config import BLOCK_REWARD, MAX_TRANSACTIONS_PER_BLOCK
 
 class Transaction(object):
     """
@@ -168,8 +169,13 @@ class TransactionBlockChain(BlockChain):
             return False
         return super(TransactionBlockChain, self).is_valid()
     
-    def mine(self):
+    def mine(self, difficulty, intents=1000):
         # get unprocessed transactions
+        try:
+            txs = requests.get("%s/unprocessed" % mempool_url).json()
+        except requests.ConnectionError:
+            pass
+
         # verify and bundle them into data field of a new block
         # compute POW hash
         raise NotImplementedError()

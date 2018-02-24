@@ -8,3 +8,4 @@ DIFFICULTY = 3 # leading zeros
 LEASE_TIME = 60 # how long the tracker keeps you registered in seconds
 CONFIRMATIONS = 6 # number of confirmations before considering a transaction final
 BLOCK_REWARD = 1
+MAX_TRANSACTIONS_PER_BLOCK = 5
