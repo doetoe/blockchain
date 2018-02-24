@@ -1,7 +1,28 @@
 #! /usr/bin/env python3
 
+"""
+When this is run as a script, it will try to connect to a tracker, which is
+just any other node that serves as a tracker for more nodes, and
+exit if it cannot. Otherwise it will start mining, while synchronizing 
+with other nodes. 
+In parallel it runs an http server that operates a full node:
+
+/blockchain    - returns the current blockchain in json format
+/chainlength   - returns the length of the chain of this miner
+/block?index=n - returns block n in json format, or 400 if doesn't exist
+
+provides tracking services:
+
+/nodes         - return a list of registered nodes
+
+and 
+
+/running       - returns "running" if accessible
+
+"""
+
 from blockchain import BlockChain
-from config import DIFFICULTY, CHAINDATA_DIR, TRACKER_ADDRESS, BLOCKCHAIN_CLASS
+from config import DIFFICULTY, CHAINDATA_DIR, TRACKER_ADDRESSES, BLOCKCHAIN_CLASS
 from util import port_is_free
 from flask import Flask, request, abort
 import requests
@@ -13,23 +34,48 @@ import getopt
 from multiprocessing import Process, Manager
 
 node = Flask(__name__)
+node.active_peers = {}
 
-"""
-When this is run as a script, it will try to connect to the tracker, and
-exit if it cannot. Otherwise it will start mining, while synchronizing 
-with other nodes. 
-In parallel it runs an http server that serves
+def timeout_peers():
+    """Remove stale peers from the list of active peers"""
+    node.active_peers = \
+        dict(peer for peer in node.active_peers.items() if
+             now - peer[1] < LEASE_TIME)
 
-/running       - returns "running" if accessible
-/blockchain    - returns the current blockchain in json format
-/chainlength   - returns the length of the chain of this miner
-/block?index=n - returns block n in json format, or 400 if doesn't exist
-"""
+@node.route('/nodes', methods=['GET'])
+def nodes():
+    """
+    Returns a list of known nodes in the form of a json list of complete
+    internet URL's (without protocol specifier), e.g. hostname.com:5001. 
+    It will also get rid of nodes whose lease time has passed (rather than
+    have that done in a separate thread).
+    Note: in reality it returns a list with the strings which clients called
+    /register with. Nodes expect these to be URL's.
+    """
+    now = time.time()
+    timeout_peers()
+    return json.dumps(list(node.active_peers.keys()))
+
+# @node.route('/difficulty', methods=['GET'])
+# def difficulty():
+#     """This should not really come from the node. It only depends on the
+#     blockchain."""
+#     return str(DIFFICULTY)
+
+@node.route('/register', methods=['GET'])
+def register():
+    node.active_peers[request.args.get('url')] = time.time()
+    
+# @node.route('/unregister', methods=['GET'])
+# def unregister():
+#     peer = request.args.get('url')
+#     if peer in node.active_peers:
+#         node.active_peers.pop(peer)
 
 @node.route('/running', methods=['GET'])
 def running():
     return "running"
-    
+
 @node.route('/blockchain', methods=['GET'])
 def blockchain():
     """
@@ -70,7 +116,7 @@ def block():
         return block_file.read()
 
 def running(url):
-    """Both node and tracker provide this service."""
+    """Returns whether a node is running at this address."""
     address = "http://%s/running" % url
     try:
         return requests.get(address).text == "running"
@@ -84,7 +130,31 @@ def chainlength(url):
     except:
         return -1
 
-def start_mining(host, port, tracker_url, shared_dict):
+def update_peers(address):
+    """Update status of peers known to the specified address within this node,
+    including the address itself.
+    Since the peers are expected to keep their list of known peers up-to-date,
+    this won't be recursed.
+    """
+    if not running(address):
+        if address in node.active_peers:
+            node.active_peers.pop(address)
+        return
+
+    now = time.time()
+    node.active_peers[address] = now
+    
+    try:
+        peers = requests.get("http://%s/nodes" % address).json()
+    except requests.ConnectionError:
+        return
+    for peer in peers:
+        if running(peer):
+            node.active_peers[peer] = now
+        elif peer in node.active_peers:
+            node.active_peers.pop(peer)
+        
+def start_mining(host, port, shared_dict):
     """This is the main function, that executes in an infinite loop as long
     as this node is running."""
     chaindata_dir = os.path.join(CHAINDATA_DIR, str(port))
@@ -100,22 +170,15 @@ def start_mining(host, port, tracker_url, shared_dict):
         # update registration in every iteration
         # If you only want to broadcast updated blocks, you could do this
         # when you find a block.
-        try:
-            requests.get("%s/register" % tracker_url, params={"url": url})
-        except requests.ConnectionError:
-            print("Couldn't connect to tracker: mining local blockchain")
-            # Could also abort here, since unbroadcasted blocks won't
-            # get validated
+        update_peers()
+        for peer_url in node.active_peers.keys():
+            try:
+                requests.get("%s/register" % peer_url, params={"url": url})
+            except requests.ConnectionError:
+                print("Couldn't register with %s" % peer_url)
         print("Chain length = %d" % len(blockchain))
-        try:
-            nodes = [url for url in
-                     requests.get("%s/nodes" % tracker_url).json()
-                     if running(url)]
-            # print(nodes)
-        except requests.ConnectionError:
-            nodes = []
         updated = False # to avoid unnecessary disk operations
-        for node_url in nodes:
+        for node_url in node.active_peers.keys():
             if node_url == url: # the current node itself
                 continue
             try:
@@ -152,32 +215,30 @@ if __name__ == '__main__':
         Options:
         -h            show this help
         -H <host>     the host on which to run (default 127.0.0.1)
-        -p <port>     the port on which to listen (default the first available one after 5000)
-        -t <address>  the tracker address, default %s
-        """ % (os.path.basename(sys.argv[0]), TRACKER_ADDRESS))
+        -p <port>     the port on which to listen (default the first available one starting at 5000)
+        -t <address>  a peer (tracker) address, by default a hardcoded list will be tried
+        """ % (os.path.basename(sys.argv[0]), TRACKER_ADDRESSES))
         sys.exit()
     
     host = opt.get("-H", "127.0.0.1")
-    tracker_url = "http://%s" % (opt.get("-t", TRACKER_ADDRESS))
-    
+
     if "-p" in opt:
         port = int(opt["-p"])
         if not port_is_free(port):
             raise RuntimeError("Port %d is already in use" % port)
     else: 
         # look for free port
-        port = 5001
+        port = 5000
         while not port_is_free(port):
             port += 1
 
-    try:
-        requests.get("%s/running" % tracker_url)
-    except BaseException as e:
-        raise ConnectionError(
-            "Tracker not running at %s: %s." \
-            % (tracker_url, type(e)) + \
-            "Specify the address on the command line if it doesn't " + \
-            "run at the default address %s." % (TRACKER_ADDRESS))
+    if "-t" in opt:
+        update_peers(opt["-t"])
+    if not node.active_peers: # either tracker not running or not specified
+        for address in TRACKER_ADDRESSES:
+            update_peers(address)
+    if not node.active_peers:
+        print("No active nodes found. Going solo.")
 
     # This generates a dictionary that can be shared between processes
     shared_dict = Manager().dict()
@@ -185,10 +246,10 @@ if __name__ == '__main__':
 
     miner = Process(
         target=start_mining,
-        args=(host, port, tracker_url, shared_dict))
+        args=(host, port, shared_dict))
     miner.start()
     
-    print ("running node on port %d" % port)
+    print ("running node on %s:%d" % (host,port))
     try:
         node.run(host=host, port=port)
     except:

@@ -2,7 +2,7 @@ from ecdsa import NIST192p as CURVE
 from blockchain import BlockChain as BLOCKCHAIN_CLASS
 # from transaction import TransactionBlockChain as BLOCKCHAIN_CLASS
 CHAINDATA_DIR = 'chaindata'
-TRACKER_ADDRESS = "localhost:5000"
+TRACKER_ADDRESSES = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003"]
 MEMPOOL_ADDRESS = "localhost:5100"
 DIFFICULTY = 3 # leading zeros
 LEASE_TIME = 60 # how long the tracker keeps you registered in seconds

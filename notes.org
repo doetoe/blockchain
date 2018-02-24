@@ -30,6 +30,13 @@
 * Robustness
 - nodes and mempool continue working if the tracker is down.
 
+* Nodes
+Each node serves as a full node, a miner and a tracker. When it is started, it tries to find other nodes first by iterating through a list TRACKER_ADDRESSES that is in the configuration file config.py. Alternatively a known node address can be specified.
+
+It obtains a list of peers from each one of them, and registers with all running nodes.
+
+It then starts both mining, and operating a full node (serving the full blockchain) as well as peer-discovery services. In the future it should also provide mempool services.
+
 * Operation
 - Start the tracker. 
 - Start one or more nodes. These will start mining and synchronizing. If the tracker goes down, they will keep mining (and trying to connect and broadcast/synchronize).

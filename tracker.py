@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+"""Obsolete: the generic node now provides all tracking services."""
+
 from flask import Flask, request
 import os
 import json
