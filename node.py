@@ -16,13 +16,6 @@ provides tracking services:
 /nodes         - return a list of registered nodes
 /register      - register as a peer
 
-provides mempool services (receive and broadcast transactions):
-
-/pushtx(tx)       # post transaction in json format
-/unprocessed      # json of all unprocessed transactions
-/balance(address)
-/confirmations(transaction_id)
-
 Later (if needed) /whichblock(txid)
 
 and 
@@ -242,9 +235,7 @@ def start_mining(host, port, shared_dict, active_peers):
 # Run mining node at specified port, or, if no port is specified, look for
 # port that is free, probably one that has run before if available.
 # It will at the same time start mining and start broadcasting.
-def start(argv):
-    opt, remaining = getopt.getopt(argv[1:], "H:p:ht:")
-    opt = dict(opt)
+def start(argv, opt, remaining):
     if "-h" in opt:
         print("""Usage: 
         %s [options]
@@ -291,4 +282,6 @@ def start(argv):
         shared_dict["running"] = False
 
 if __name__ == '__main__':
-    start(sys.argv)
+    opt, remaining = getopt.getopt(argv[1:], "H:p:ht:")
+    opt = dict(opt)    
+    start(sys.argv, opt, remaining)
