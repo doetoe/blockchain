@@ -169,15 +169,13 @@ class TransactionBlockChain(BlockChain):
             return False
         return super(TransactionBlockChain, self).is_valid()
     
-    def mine(self, difficulty, intents=1000):
+    def next_block_data(self, node_address, active_peers):
         # get unprocessed transactions
         try:
             txs = requests.get("%s/unprocessed" % mempool_url).json()
         except requests.ConnectionError:
-            pass
-
-        # verify and bundle them into data field of a new block
-        # compute POW hash
+            return None
+        
         raise NotImplementedError()
     
     def get_balances(self, confirmations=1):

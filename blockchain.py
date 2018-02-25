@@ -91,7 +91,16 @@ class BlockChain(object):
     def __ne__(self, other):
         return not self == other
 
-    def mine(self, difficulty, intents=1000):
+    def next_index(self):
+        return 0 if len(self) == 0 else self.head().index + 1
+        
+    def next_block_data(self, node_address, active_peers):
+        """Assembles data for the next block. Before over call to mine() 
+        while a node is running, this function will be called to assemble
+        data to include in a block."""
+        return "Block #%s, mined by %s" % (self.next_index(), node_address)
+        
+    def mine(self, data, difficulty, intents=1000):
         """Try to mine a next block for the given difficulty by computing 
         the specified number of hashes.
         With the strategy used here the nonce is never very high, but that 
@@ -101,11 +110,11 @@ class BlockChain(object):
         If no valid block is found in the given number of intents, None is 
         returned.
         """
-        index = 0 if len(self) == 0 else self.head().index + 1
+        if data is None:
+            return None
         timestamp = datetime.datetime.utcnow().isoformat()
-        data = "Block #%s" % (index)
         prev_hash = "" if len(self) == 0 else self.head().get_hash()
-        block = self.new_block(index=index, timestamp=timestamp,
+        block = self.new_block(index=self.next_index(), timestamp=timestamp,
                                data=data, prev_hash=prev_hash, nonce=0)
     
         for nonce in range(intents):

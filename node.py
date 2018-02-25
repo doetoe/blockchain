@@ -211,7 +211,8 @@ def start_mining(host, port, shared_dict, active_peers):
         if updated:
             blockchain.save(chaindata_dir)
         print("Chain length = %d" % len(blockchain))
-        nextblock = blockchain.mine(DIFFICULTY, intents=1000)
+        data = blockchain.next_block_data(node_address, active_peers)
+        nextblock = blockchain.mine(data, DIFFICULTY, intents=1000)
         if nextblock is not None:
             blockchain.append(nextblock)
             blockchain.save(chaindata_dir)
