@@ -16,6 +16,15 @@ provides tracking services:
 /nodes         - return a list of registered nodes
 /register      - register as a peer
 
+provides mempool services (receive and broadcast transactions):
+
+/pushtx(tx)       # post transaction in json format
+/unprocessed      # json of all unprocessed transactions
+/balance(address)
+/confirmations(transaction_id)
+
+Later (if needed) /whichblock(txid)
+
 and 
 
 /running       - returns "running" if accessible
@@ -41,6 +50,8 @@ node = Flask(__name__)
 # to be active. This node itself shouldn't be in the set, dictionary, though
 # this is not assumed.
 active_peers = process_manager.dict()
+# Generic dictionary to be shared between processes
+shared_dict = process_manager.dict()
 
 def timeout_peers():
     """Remove stale peers from the list of active peers"""
@@ -178,7 +189,24 @@ def update_peers(node_address, active_peers, addresses=None):
                 active_peers.pop(peer)
 
     print("known peers: %s" % (active_peers.keys()))
-       
+
+def get_longest_blockchain(blockchain, node_address, active_peers):
+    longest_blockchain = blockchain
+    for peer_address in active_peers.keys():
+        if peer_address == node_address: # the current node itself
+            continue
+        try:
+            if chainlength(peer_address) > len(longest_blockchain):
+                peer_blockchain = BLOCKCHAIN_CLASS.from_url(
+                    "http://%s/blockchain" % (peer_address))
+                if peer_blockchain.is_valid(DIFFICULTY) and \
+                   len(peer_blockchain) > len(longest_blockchain):
+                    longest_blockchain = peer_blockchain
+        except requests.ConnectionError:
+            print("Failed to obtain blockchain from %s" % peer_address)
+            pass
+    return longest_blockchain
+    
 def start_mining(host, port, shared_dict, active_peers):
     """This is the main function, that executes in an infinite loop as long
     as this node is running."""
@@ -193,23 +221,13 @@ def start_mining(host, port, shared_dict, active_peers):
     node_address = "%s:%d" % (host,port)
     while shared_dict["running"]: # stop mining when webserver is stopped
         update_peers(node_address, active_peers)
-        updated = False # to avoid unnecessary disk operations
-        for peer_address in active_peers.keys():
-            if peer_address == node_address: # the current node itself
-                continue
-            try:
-                if chainlength(peer_address) > len(blockchain):
-                    peer_blockchain = BLOCKCHAIN_CLASS.from_url(
-                        "http://%s/blockchain" % (peer_address))
-                    if peer_blockchain.is_valid(DIFFICULTY) and \
-                       len(peer_blockchain) > len(blockchain):
-                        blockchain = peer_blockchain
-                        updated = True
-            except requests.ConnectionError:
-                print("Failed to obtain blockchain from %s" % peer_address)
-                pass
-        if updated:
+
+        longest_blockchain = get_longest_blockchain(
+            blockchain, node_address, active_peers)
+        if not longest_blockchain is blockchain:
+            blockchain = longest_blockchain
             blockchain.save(chaindata_dir)
+            
         print("Chain length = %d" % len(blockchain))
         data = blockchain.next_block_data(node_address, active_peers)
         nextblock = blockchain.mine(data, DIFFICULTY, intents=1000)
@@ -224,8 +242,8 @@ def start_mining(host, port, shared_dict, active_peers):
 # Run mining node at specified port, or, if no port is specified, look for
 # port that is free, probably one that has run before if available.
 # It will at the same time start mining and start broadcasting.
-if __name__ == '__main__':
-    opt, remaining = getopt.getopt(sys.argv[1:], "H:p:ht:")
+def start(argv):
+    opt, remaining = getopt.getopt(argv[1:], "H:p:ht:")
     opt = dict(opt)
     if "-h" in opt:
         print("""Usage: 
@@ -238,7 +256,7 @@ if __name__ == '__main__':
                       one starting at 5000)
         -t <address>  a peer (tracker) address, by default a hardcoded list 
                       from the configuration file will be tried
-        """ % (os.path.basename(sys.argv[0]), TRACKER_ADDRESSES))
+        """ % (os.path.basename(argv[0]), TRACKER_ADDRESSES))
         sys.exit()
     
     host = opt.get("-H", "localhost")
@@ -259,8 +277,6 @@ if __name__ == '__main__':
     if not active_peers:
         print("No active nodes found. Going solo.")
 
-    # This generates a dictionary that can be shared between processes
-    shared_dict = process_manager.dict()
     shared_dict["running"] = True
 
     miner = Process(
@@ -274,3 +290,5 @@ if __name__ == '__main__':
     except:
         shared_dict["running"] = False
 
+if __name__ == '__main__':
+    start(sys.argv)
