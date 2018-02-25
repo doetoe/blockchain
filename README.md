@@ -1,6 +1,6 @@
 # README #
 
-The lowest level system consists of a network of *nodes* that mindlessly mine data blocks satisfying a proof-of-work and forming a *blockchain*, and synchronize these among each other. Since the main focus of this exercise is not in the networking details (for the moment), like peer discovery, block broadcasting, etc, there is a *tracker* that allows nodes to find each other.
+The lowest level system consists of a network of *nodes* that mindlessly mine data blocks satisfying a proof-of-work and forming a *blockchain*, and synchronize these among each other.
 
 For this to works correctly you need the modules
 
@@ -11,7 +11,7 @@ For this to works correctly you need the modules
 * util
 * config
 
-The next level adds *transactions* to this. Users can generate private keys and addresses and send transaction to an additional kind of node called a *mempool*, representing the *global transaction mempool*. Nodes can pull unprocessed transactions from it and include them in their blocks. Note that they are still the same blocks, the same mining, the same blockchains, only now the data field is interpreted as containing a bundle of transactions, which are executed when they get validated in the blockchain. For inclusion the nodes should check for additional validity: balances must be non-negative at any point in the blockchain.
+The next level adds *transactions* to this. Users can generate private keys and addresses and send transaction to an additional kind of node called a *mempool*, representing the *global transaction mempool*. Nodes can pull unprocessed transactions from it and include them in their blocks. For inclusion the nodes should check for additional validity: balances must be non-negative at any point in the blockchain.
 
 For transactions to work correctly, you need the additional modules
 
@@ -30,20 +30,21 @@ The third level adds general purpose executable data to this. This is still very
 
 The tracker supports
 
-* /running         - returns running when the tracker is running
-* /nodes           - returns a list of URL's of registered miners
-* /register(url)   - register a url with the tracker
+##### For each node you want to run, execute node.py as a script.
 
-##### For each miner you want to run, execute node.py as a script.
+This will start mining and also tries to discover other nodes and synchronize with them.
 
-This will start mining and also connects to the tracker to discover other miners and synchronize with them.
-
-The nodes support
+The nodes operate a full node:
   
   * /running      - returns running when the node is running
   * /block(n)     - returns block n in json format
   * /blockchain   - returns the blockchain as seen by this peer in json format
   * /chainlength  - returns the chainlength as seen by this peer
+
+and also peer discovery services
+
+  * /nodes           - returns a list of URL's of registered miners
+  * /register(url)   - register a url with the tracker
 
 Unless the tracker and all miners run on the same computer, you have to specify hostnames and ports, call both with -h to see options.
 

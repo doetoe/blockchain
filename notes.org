@@ -5,6 +5,7 @@
 - all unprocessed transactions are served rather than just some number
 
 * To be done
+- update_peers and start_mining in node.py run in a separate process. They have to share the list of peers with the web process. This is still to be done.
 - Inherit TransactionBlockChain from BlockChain to override the "mine" function. Maybe also the TransactionBlock. In mining, unprocessed transactions should be retrieved and bundled.
 - The TransactionBlockChain in its "mine" function has to have access to the mempool address or obtain unprocessed transactions in a different way. The "Node" right now is generic, which is good, but it could be that it needs to be different for a node processing transactions than for one validating basic blocks, and again for one that processes contracts. 
 - Maybe integrate mempool in a general node (in some elegant, flexible, extensible and configurable way)
@@ -16,6 +17,7 @@
 - Good tests for web services
 - fees and block reward go to miner_address
 - Instead of a mempool could have all nodes implement the services of the mempool, and synchronize the mempool between them
+- deal with wrong nodes in an elegant way
 
 * Validity of a block
 - correct format

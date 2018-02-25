@@ -14,6 +14,7 @@ In parallel it runs an http server that operates a full node:
 provides tracking services:
 
 /nodes         - return a list of registered nodes
+/register      - register as a peer
 
 and 
 
@@ -22,9 +23,10 @@ and
 """
 
 from blockchain import BlockChain
-from config import DIFFICULTY, CHAINDATA_DIR, TRACKER_ADDRESSES, BLOCKCHAIN_CLASS
+from config import DIFFICULTY, CHAINDATA_DIR, TRACKER_ADDRESSES, \
+    BLOCKCHAIN_CLASS, LEASE_TIME
 from util import port_is_free
-from flask import Flask, request, abort
+from flask import Flask, request, abort, escape
 import requests
 import os
 import json
@@ -34,13 +36,17 @@ import getopt
 from multiprocessing import Process, Manager
 
 node = Flask(__name__)
+# dictionary (peer, time) of peers and the last time at which they were seen
+# to be active. This node itself shouldn't be in the set, dictionary, though
+# this is not assumed.
 node.active_peers = {}
 
 def timeout_peers():
     """Remove stale peers from the list of active peers"""
-    node.active_peers = \
-        dict(peer for peer in node.active_peers.items() if
-             now - peer[1] < LEASE_TIME)
+    return # timeout disabled
+    # node.active_peers = \
+    #     dict(peer for peer in node.active_peers.items() if
+    #          now - peer[1] < LEASE_TIME)
 
 @node.route('/nodes', methods=['GET'])
 def nodes():
@@ -64,7 +70,9 @@ def nodes():
 
 @node.route('/register', methods=['GET'])
 def register():
-    node.active_peers[request.args.get('url')] = time.time()
+    address = request.args.get('url')
+    node.active_peers[address] = time.time()
+    return "registered %s" % escape(address)
     
 # @node.route('/unregister', methods=['GET'])
 # def unregister():
@@ -130,31 +138,51 @@ def chainlength(url):
     except:
         return -1
 
-def update_peers(address):
-    """Update status of peers known to the specified address within this node,
-    including the address itself.
-    Since the peers are expected to keep their list of known peers up-to-date,
-    this won't be recursed.
+def update_peers(node, addresses=None):
+    """Add the addresses to the known peers (if specified), obtain all peers 
+    of known peers, check their status, register with the live ones, and 
+    update the set of known active peers.
     """
-    if not running(address):
-        if address in node.active_peers:
-            node.active_peers.pop(address)
-        return
-
     now = time.time()
-    node.active_peers[address] = now
-    
-    try:
-        peers = requests.get("http://%s/nodes" % address).json()
-    except requests.ConnectionError:
-        return
-    for peer in peers:
-        if running(peer):
-            node.active_peers[peer] = now
-        elif peer in node.active_peers:
-            node.active_peers.pop(peer)
+
+    # candidate first level peers
+    peers1 = set(node.active_peers.keys())
+    if addresses:
+        peers1.update(addresses)
+    if node.address in peers1:
+        peers1.remove(node.address)
+
+    print("peers1: %s" % (peers1))
         
-def start_mining(host, port, shared_dict):
+    # candidate 2nd level peers
+    peers2 = set()
+    for peer1 in peers1:
+        try:
+            peers2.update(requests.get("http://%s/nodes" % peer1).json())
+            peers2.add(peer1)
+        except requests.ConnectionError:
+            print("%s not running" % peer1)
+            if peer1 in node.active_peers:
+                node.active_peers.pop(peer1)
+    if node.address in peers2:
+        peers2.remove(node.address)
+
+    print("peers2: %s" % (peers2))
+    
+    for peer in peers2:
+        # if refreshed < 10 seconds ago, state is assumed to be unchanged
+        #if now - node.active_peers.get(peer,0) < 10 or running(peer):
+        try:
+            requests.get("http://%s/register" % peer, params={"url": node.address})
+            node.active_peers[peer] = now
+        except requests.ConnectionError:
+            print("Couldn't register with %s" % peer)
+            if peer in node.active_peers:
+                node.active_peers.pop(peer)
+
+    print("known peers: %s" % (node.active_peers.keys()))
+                
+def start_mining(node, host, port, shared_dict):
     """This is the main function, that executes in an infinite loop as long
     as this node is running."""
     chaindata_dir = os.path.join(CHAINDATA_DIR, str(port))
@@ -165,34 +193,26 @@ def start_mining(host, port, shared_dict):
     blockchain = BLOCKCHAIN_CLASS.load(data_dir=chaindata_dir)
     assert blockchain.is_valid(DIFFICULTY)
 
-    url = "%s:%d" % (host, port)
     while shared_dict["running"]: # stop mining when webserver is stopped
-        # update registration in every iteration
-        # If you only want to broadcast updated blocks, you could do this
-        # when you find a block.
-        update_peers()
-        for peer_url in node.active_peers.keys():
-            try:
-                requests.get("%s/register" % peer_url, params={"url": url})
-            except requests.ConnectionError:
-                print("Couldn't register with %s" % peer_url)
-        print("Chain length = %d" % len(blockchain))
+        update_peers(node)
         updated = False # to avoid unnecessary disk operations
-        for node_url in node.active_peers.keys():
-            if node_url == url: # the current node itself
+        for peer_address in node.active_peers.keys():
+            if peer_address == node.address: # the current node itself
                 continue
             try:
-                if chainlength(node_url) > len(blockchain):
-                    node_blockchain = BLOCKCHAIN_CLASS.from_url(
-                        "http://%s/blockchain" % (node_url))
-                    if node_blockchain.is_valid(DIFFICULTY) and \
-                       len(node_blockchain) > len(blockchain):
-                        blockchain = node_blockchain
+                if chainlength(peer_address) > len(blockchain):
+                    peer_blockchain = BLOCKCHAIN_CLASS.from_url(
+                        "http://%s/blockchain" % (peer_address))
+                    if peer_blockchain.is_valid(DIFFICULTY) and \
+                       len(peer_blockchain) > len(blockchain):
+                        blockchain = peer_blockchain
                         updated = True
             except requests.ConnectionError:
+                print("Failed to obtain blockchain from %s" % peer_address)
                 pass
         if updated:
             blockchain.save(chaindata_dir)
+        print("Chain length = %d" % len(blockchain))
         nextblock = blockchain.mine(DIFFICULTY, intents=1000)
         if nextblock is not None:
             blockchain.append(nextblock)
@@ -216,11 +236,12 @@ if __name__ == '__main__':
         -h            show this help
         -H <host>     the host on which to run (default 127.0.0.1)
         -p <port>     the port on which to listen (default the first available one starting at 5000)
-        -t <address>  a peer (tracker) address, by default a hardcoded list will be tried
+        -t <address>  a peer (tracker) address, by default a hardcoded list from the
+                      configuration file will be tried
         """ % (os.path.basename(sys.argv[0]), TRACKER_ADDRESSES))
         sys.exit()
     
-    host = opt.get("-H", "127.0.0.1")
+    host = opt.get("-H", "localhost")
 
     if "-p" in opt:
         port = int(opt["-p"])
@@ -232,11 +253,8 @@ if __name__ == '__main__':
         while not port_is_free(port):
             port += 1
 
-    if "-t" in opt:
-        update_peers(opt["-t"])
-    if not node.active_peers: # either tracker not running or not specified
-        for address in TRACKER_ADDRESSES:
-            update_peers(address)
+    node.address = "%s:%d" % (host,port)
+    update_peers(node, TRACKER_ADDRESSES + ([opt["-t"]] if "-t" in opt else []))
     if not node.active_peers:
         print("No active nodes found. Going solo.")
 
@@ -246,10 +264,10 @@ if __name__ == '__main__':
 
     miner = Process(
         target=start_mining,
-        args=(host, port, shared_dict))
+        args=(node, host, port, shared_dict))
     miner.start()
-    
-    print ("running node on %s:%d" % (host,port))
+
+    print ("running node on %s" % (node.address))
     try:
         node.run(host=host, port=port)
     except:
