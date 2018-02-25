@@ -35,17 +35,18 @@ import time
 import getopt
 from multiprocessing import Process, Manager
 
+process_manager = Manager()
 node = Flask(__name__)
 # dictionary (peer, time) of peers and the last time at which they were seen
 # to be active. This node itself shouldn't be in the set, dictionary, though
 # this is not assumed.
-node.active_peers = {}
+active_peers = process_manager.dict()
 
 def timeout_peers():
     """Remove stale peers from the list of active peers"""
     return # timeout disabled
-    # node.active_peers = \
-    #     dict(peer for peer in node.active_peers.items() if
+    # active_peers = \
+    #     dict(peer for peer in active_peers.items() if
     #          now - peer[1] < LEASE_TIME)
 
 @node.route('/nodes', methods=['GET'])
@@ -60,7 +61,7 @@ def nodes():
     """
     now = time.time()
     timeout_peers()
-    return json.dumps(list(node.active_peers.keys()))
+    return json.dumps(list(active_peers.keys()))
 
 # @node.route('/difficulty', methods=['GET'])
 # def difficulty():
@@ -71,14 +72,14 @@ def nodes():
 @node.route('/register', methods=['GET'])
 def register():
     address = request.args.get('url')
-    node.active_peers[address] = time.time()
+    active_peers[address] = time.time()
     return "registered %s" % escape(address)
     
 # @node.route('/unregister', methods=['GET'])
 # def unregister():
 #     peer = request.args.get('url')
-#     if peer in node.active_peers:
-#         node.active_peers.pop(peer)
+#     if peer in active_peers:
+#         active_peers.pop(peer)
 
 @node.route('/running', methods=['GET'])
 def running():
@@ -138,7 +139,7 @@ def chainlength(url):
     except:
         return -1
 
-def update_peers(node, addresses=None):
+def update_peers(node_address, active_peers, addresses=None):
     """Add the addresses to the known peers (if specified), obtain all peers 
     of known peers, check their status, register with the live ones, and 
     update the set of known active peers.
@@ -146,14 +147,12 @@ def update_peers(node, addresses=None):
     now = time.time()
 
     # candidate first level peers
-    peers1 = set(node.active_peers.keys())
+    peers1 = set(active_peers.keys())
     if addresses:
         peers1.update(addresses)
-    if node.address in peers1:
-        peers1.remove(node.address)
+    if node_address in peers1:
+        peers1.remove(node_address)
 
-    print("peers1: %s" % (peers1))
-        
     # candidate 2nd level peers
     peers2 = set()
     for peer1 in peers1:
@@ -162,27 +161,25 @@ def update_peers(node, addresses=None):
             peers2.add(peer1)
         except requests.ConnectionError:
             print("%s not running" % peer1)
-            if peer1 in node.active_peers:
-                node.active_peers.pop(peer1)
-    if node.address in peers2:
-        peers2.remove(node.address)
+            if peer1 in active_peers:
+                active_peers.pop(peer1)
+    if node_address in peers2:
+        peers2.remove(node_address)
 
-    print("peers2: %s" % (peers2))
-    
     for peer in peers2:
         # if refreshed < 10 seconds ago, state is assumed to be unchanged
-        #if now - node.active_peers.get(peer,0) < 10 or running(peer):
+        #if now - active_peers.get(peer,0) < 10 or running(peer):
         try:
-            requests.get("http://%s/register" % peer, params={"url": node.address})
-            node.active_peers[peer] = now
+            requests.get("http://%s/register" % peer, params={"url": node_address})
+            active_peers[peer] = now
         except requests.ConnectionError:
             print("Couldn't register with %s" % peer)
-            if peer in node.active_peers:
-                node.active_peers.pop(peer)
+            if peer in active_peers:
+                active_peers.pop(peer)
 
-    print("known peers: %s" % (node.active_peers.keys()))
-                
-def start_mining(node, host, port, shared_dict):
+    print("known peers: %s" % (active_peers.keys()))
+       
+def start_mining(host, port, shared_dict, active_peers):
     """This is the main function, that executes in an infinite loop as long
     as this node is running."""
     chaindata_dir = os.path.join(CHAINDATA_DIR, str(port))
@@ -193,11 +190,12 @@ def start_mining(node, host, port, shared_dict):
     blockchain = BLOCKCHAIN_CLASS.load(data_dir=chaindata_dir)
     assert blockchain.is_valid(DIFFICULTY)
 
+    node_address = "%s:%d" % (host,port)
     while shared_dict["running"]: # stop mining when webserver is stopped
-        update_peers(node)
+        update_peers(node_address, active_peers)
         updated = False # to avoid unnecessary disk operations
-        for peer_address in node.active_peers.keys():
-            if peer_address == node.address: # the current node itself
+        for peer_address in active_peers.keys():
+            if peer_address == node_address: # the current node itself
                 continue
             try:
                 if chainlength(peer_address) > len(blockchain):
@@ -235,9 +233,10 @@ if __name__ == '__main__':
         Options:
         -h            show this help
         -H <host>     the host on which to run (default 127.0.0.1)
-        -p <port>     the port on which to listen (default the first available one starting at 5000)
-        -t <address>  a peer (tracker) address, by default a hardcoded list from the
-                      configuration file will be tried
+        -p <port>     the port on which to listen (default the first available 
+                      one starting at 5000)
+        -t <address>  a peer (tracker) address, by default a hardcoded list 
+                      from the configuration file will be tried
         """ % (os.path.basename(sys.argv[0]), TRACKER_ADDRESSES))
         sys.exit()
     
@@ -253,21 +252,22 @@ if __name__ == '__main__':
         while not port_is_free(port):
             port += 1
 
-    node.address = "%s:%d" % (host,port)
-    update_peers(node, TRACKER_ADDRESSES + ([opt["-t"]] if "-t" in opt else []))
-    if not node.active_peers:
+    node_address = "%s:%d" % (host,port)
+    update_peers(node_address, active_peers,
+                 TRACKER_ADDRESSES + ([opt["-t"]] if "-t" in opt else []))
+    if not active_peers:
         print("No active nodes found. Going solo.")
 
     # This generates a dictionary that can be shared between processes
-    shared_dict = Manager().dict()
+    shared_dict = process_manager.dict()
     shared_dict["running"] = True
 
     miner = Process(
         target=start_mining,
-        args=(node, host, port, shared_dict))
+        args=(host, port, shared_dict, active_peers))
     miner.start()
 
-    print ("running node on %s" % (node.address))
+    print ("running node on %s" % (node_address))
     try:
         node.run(host=host, port=port)
     except:
