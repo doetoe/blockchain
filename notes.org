@@ -5,9 +5,12 @@
 - all unprocessed transactions are served rather than just some number
 
 * To be done
-- Integrate mempool functionality in the extension of node in the file transactionnode.py
-- change datafile layout: DATA_DIR/<port>/chaindata, DATA_DIR/<port>/transactions.db
-- Inherit TransactionBlockChain from BlockChain to override the "mine" function. Maybe also the TransactionBlock. In mining, unprocessed transactions should be retrieved and bundled.
+- Check mempool functionality in the extension of node in the file transactionnode.py
+- like blockchain, synchronize transactions:
+  - for each node, get unprocessed transactions (blockchain will synchronize soon enough to take care of differences in status), add to db (with block=NULL), set block index from local_blockchain (necessary?).
+  - For the moment no effort is made to store the full historical mempool, processed transactions are already in the blockchain; alternatively could store transactions from the blockchain into the local mempool db, or broadcast and retrieve a full list of transactions.
+- remove double-spend transactions (maybe). Alternatively they could float around until the balance is high enough.
+- Inherit TransactionBlockChain from BlockChain to override the "mine" function. Maybe also the TransactionBlock. In mining, unprocessed transactions should be retrieved from all or some peers, or only local store, which is separately updated, and bundled.
 - The TransactionBlockChain in its "mine" function has to have access to the mempool address or obtain unprocessed transactions in a different way. The "Node" right now is generic, which is good, but it could be that it needs to be different for a node processing transactions than for one validating basic blocks, and again for one that processes contracts. 
 - Maybe integrate mempool in a general node (in some elegant, flexible, extensible and configurable way)
 - In node, tracker, mempool, better separate core functionality from network operations if possible (maybe in component classes)
