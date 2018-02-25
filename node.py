@@ -25,7 +25,7 @@ and
 """
 
 from blockchain import BlockChain
-from config import DIFFICULTY, CHAINDATA_DIR, TRACKER_ADDRESSES, \
+from config import DIFFICULTY, DATA_DIR, TRACKER_ADDRESSES, \
     BLOCKCHAIN_CLASS, LEASE_TIME
 from util import port_is_free
 from flask import Flask, request, abort, escape
@@ -45,6 +45,7 @@ node = Flask(__name__)
 active_peers = process_manager.dict()
 # Generic dictionary to be shared between processes
 shared_dict = process_manager.dict()
+node_address = None
 
 def timeout_peers():
     """Remove stale peers from the list of active peers"""
@@ -89,14 +90,24 @@ def register():
 def running():
     return "running"
 
+def get_nodedata_dir(port, dirname, create=False):
+    """The data directory for the client running at the specified port.
+    When create=True, it will be created if it doesn't exist."""
+    data_dir = os.path.join(DATA_DIR, str(port), dirname)
+    if create and not os.path.isdir(data_dir):
+        os.makedirs(data_dir)
+    return data_dir
+
+def get_chaindata_dir(port, create=False):
+    return get_nodedata_dir(port, "chaindata", create)
+    
 @node.route('/blockchain', methods=['GET'])
 def blockchain():
     """
     Loads the blockchain from disk and serves it as a json list of dictionaries.
     """
     port = request.environ["SERVER_PORT"] # already is a string
-    data_dir = os.path.join(CHAINDATA_DIR, port)
-    ret = BLOCKCHAIN_CLASS.load(data_dir).as_json()
+    ret = BLOCKCHAIN_CLASS.load(get_chaindata_dir(port)).as_json()
     return ret
 
 @node.route('/chainlength', methods=['GET'])
@@ -104,8 +115,7 @@ def chainlength():
     """Note that the indexing starts at 0, so if the length is n, the next
     block to mine is block n."""
     port = request.environ["SERVER_PORT"]
-    data_dir = os.path.join(CHAINDATA_DIR, port)
-    return str(len(os.listdir(data_dir)))
+    return str(len(os.listdir(get_chaindata_dir(port))))
     
 @node.route('/block', methods=['GET'])
 def block():
@@ -122,7 +132,7 @@ def block():
     index = int(request.args.get('index'))
     # find out what port you are running on: that is the directory name
     port = request.environ["SERVER_PORT"]
-    filename = os.path.join(CHAINDATA_DIR, port, "%06d.json" % index)
+    filename = os.path.join(get_chaindata_dir(port), "%06d.json" % index)
     if not os.path.isfile(filename):
         abort(400)
     with open(filename, 'r') as block_file:
@@ -203,11 +213,7 @@ def get_longest_blockchain(blockchain, node_address, active_peers):
 def start_mining(host, port, shared_dict, active_peers):
     """This is the main function, that executes in an infinite loop as long
     as this node is running."""
-    chaindata_dir = os.path.join(CHAINDATA_DIR, str(port))
-    if not os.path.isdir(CHAINDATA_DIR):
-        os.mkdir(CHAINDATA_DIR)
-    if not os.path.isdir(chaindata_dir):
-        os.mkdir(chaindata_dir)
+    chaindata_dir = get_chaindata_dir(port, create=True)
     blockchain = BLOCKCHAIN_CLASS.load(data_dir=chaindata_dir)
     assert blockchain.is_valid(DIFFICULTY)
 
@@ -231,25 +237,21 @@ def start_mining(host, port, shared_dict, active_peers):
     # This shouldn't be public, otherwise you could eliminate other nodes
     # requests.get("%s/unregister" % tracker_url, params={"url", str(port)})
     print("exiting")
-            
-# Run mining node at specified port, or, if no port is specified, look for
-# port that is free, probably one that has run before if available.
-# It will at the same time start mining and start broadcasting.
-def start(argv, opt, remaining):
-    if "-h" in opt:
-        print("""Usage: 
+
+def helptext(filename):
+    return """Usage: 
         %s [options]
 
         Options:
         -h            show this help
-        -H <host>     the host on which to run (default 127.0.0.1)
+        -H <host>     the host on which to run (default localhost)
         -p <port>     the port on which to listen (default the first available 
                       one starting at 5000)
         -t <address>  a peer (tracker) address, by default a hardcoded list 
-                      from the configuration file will be tried
-        """ % (os.path.basename(argv[0]), TRACKER_ADDRESSES))
-        sys.exit()
-    
+                      from the configuration file will be tried.
+        """ % (filename)
+
+def get_host_port(opt):
     host = opt.get("-H", "localhost")
 
     if "-p" in opt:
@@ -262,12 +264,20 @@ def start(argv, opt, remaining):
         while not port_is_free(port):
             port += 1
 
-    node_address = "%s:%d" % (host,port)
+    return host, port
+
+def find_peers(opt, node_address, active_peers):
     update_peers(node_address, active_peers,
                  TRACKER_ADDRESSES + ([opt["-t"]] if "-t" in opt else []))
     if not active_peers:
-        print("No active nodes found. Going solo.")
+        print("No active nodes found. Going solo.")    
 
+# Run mining node at specified port, or, if no port is specified, look for
+# port that is free, probably one that has run before if available.
+# It will at the same time start mining and start broadcasting.
+def start(opt, host, port, node_address, active_peers):
+    find_peers(opt, node_address, active_peers)
+    
     shared_dict["running"] = True
 
     miner = Process(
@@ -282,6 +292,12 @@ def start(argv, opt, remaining):
         shared_dict["running"] = False
 
 if __name__ == '__main__':
-    opt, remaining = getopt.getopt(argv[1:], "H:p:ht:")
+    opt, remaining = getopt.getopt(sys.argv[1:], "hH:p:t:")
     opt = dict(opt)    
-    start(sys.argv, opt, remaining)
+    if "-h" in opt:
+        print(helptext(os.path.basename(argv[0])))
+        sys.exit()
+    
+    host, port = get_host_port(opt)
+    node_address = "%s:%d" % (host,port)
+    start(opt, host, port, node_address, active_peers)
