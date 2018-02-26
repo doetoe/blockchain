@@ -240,15 +240,16 @@ def start_mining(host, port, shared_dict, active_peers):
 
 def helptext(filename):
     return """Usage: 
-        %s [options]
+        %s [options] [peer1 [peer2 ...]]
+
+        The peers are possibly running nodes that are added to a hardcoded list 
+        from the configuration file will be tried.
 
         Options:
         -h            show this help
         -H <host>     the host on which to run (default localhost)
         -p <port>     the port on which to listen (default the first available 
-                      one starting at 5000)
-        -t <address>  a peer (tracker) address, by default a hardcoded list 
-                      from the configuration file will be tried.
+                      one starting at 5000)        
         """ % (filename)
 
 def get_host_port(opt):
@@ -266,17 +267,17 @@ def get_host_port(opt):
 
     return host, port
 
-def find_peers(opt, node_address, active_peers):
+def find_peers(opt, remaining, node_address, active_peers):
     update_peers(node_address, active_peers,
-                 TRACKER_ADDRESSES + ([opt["-t"]] if "-t" in opt else []))
+                 TRACKER_ADDRESSES + remaining)
     if not active_peers:
         print("No active nodes found. Going solo.")    
 
 # Run mining node at specified port, or, if no port is specified, look for
 # port that is free, probably one that has run before if available.
 # It will at the same time start mining and start broadcasting.
-def start(opt, host, port, node_address, active_peers):
-    find_peers(opt, node_address, active_peers)
+def start(opt, remaining, host, port, node_address, active_peers):
+    find_peers(opt, remaining, node_address, active_peers)
     
     shared_dict["running"] = True
 
@@ -292,7 +293,7 @@ def start(opt, host, port, node_address, active_peers):
         shared_dict["running"] = False
 
 if __name__ == '__main__':
-    opt, remaining = getopt.getopt(sys.argv[1:], "hH:p:t:")
+    opt, remaining = getopt.getopt(sys.argv[1:], "hH:p:")
     opt = dict(opt)    
     if "-h" in opt:
         print(helptext(os.path.basename(argv[0])))
@@ -300,4 +301,4 @@ if __name__ == '__main__':
     
     host, port = get_host_port(opt)
     node_address = "%s:%d" % (host,port)
-    start(opt, host, port, node_address, active_peers)
+    start(opt, remaining, host, port, node_address, active_peers)

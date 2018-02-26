@@ -182,4 +182,4 @@ if __name__ == '__main__':
 
     # Start the node with tracker services and the new transaction services
     # as well as the mining process
-    start(opt, host, port, node_address, active_peers)
+    start(opt, remaining, host, port, node_address, active_peers)
