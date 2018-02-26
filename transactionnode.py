@@ -64,44 +64,54 @@ def get_unprocessed(db):
 def unprocessed():
     """Returns unprocessed transactions in the form of a json list 
     of transaction contructor dictionaries."""
-    update_blockchain()
+    # update_blockchain() - update is done in main_process
     return json.dumps(
         list(transaction.__dict__
              for transaction in get_unprocessed(db_connection)))
 
-def update_db_from_blockchain():
+# Should get executed in main_process (child)
+def update_db_from_blockchain(blockchain, add_missing=False):
     """Resets the block ID for each transaction in the mempool database"""
     db_connection.execute(
         "update transactions set block = NULL")
-    for block in local_blockchain:
+    for block in blockchain:
         for tx in block.get_transaction_bundle():
-            # Don't do anything with transactions in the blockchain that
-            # are not in the mempool 
+            if add_missing:
+                # add transactions in the blockchain that are not in the
+                # database.
+                # This command may not be standard SQL, but it works in sqlite
+                db_connection.execute(
+                    """insert into transactions values 
+                    (:uuid, :from_addr, :to_addr, :amount, :fee, :msg, :signature, NULL)""",
+                    tx.__dict__)
             db_connection.execute(
                 "update transactions set block = ? where uuid = ?",
                 (block.index, tx.uuid))
     db_connection.commit()
 
-def update_blockchain():
-    """Update the locally stored version of the blockchain by querying the nodes
-    and update the database from it."""
-    # download/update blockchain
-    # update_peers(node_address, active_peers) # -> not necessary
-    longest_blockchain = get_longest_blockchain(
-        local_blockchain, node_address, active_peers)
-    # update transaction pool (database): mark/unmark blocks
-    # Note that all existing transactions should in theory be in this database.
-    # Could assume that the database is up to date w.r.t. the old blockchain and
-    # only update for the newer blocks (on starting the mempool the validity will
-    # be initialized from the blockchain)
-    if not local_blockchain is longest_blockchain:
-        local_blockchain = longest_blockchain
-        update_db_from_blockchain()
+# def update_blockchain():
+#     """Update the locally stored version of the blockchain by querying the nodes
+#     and update the database from it."""
+#     # download/update blockchain
+#     # update_peers(node_address, active_peers) # -> not necessary
+#     longest_blockchain = get_longest_blockchain(
+#         local_blockchain, node_address, active_peers)
+#     # update transaction pool (database): mark/unmark blocks
+#     # Note that all existing transactions should in theory be in this database.
+#     # Could assume that the database is up to date w.r.t. the old blockchain and
+#     # only update for the newer blocks (on starting the mempool the validity will
+#     # be initialized from the blockchain)
+#     if not local_blockchain is longest_blockchain:
+#         local_blockchain = longest_blockchain
+#         update_db_from_blockchain(local_blockchain, False)
 
 @node.route('/balance', methods=['GET'])
 def balance():
-    # Note: block rewards and recipients of fees don't end up in the database
-    update_blockchain()
+    # update_blockchain() - update is done in main_process
+    # NOTE: block rewards and recipients of fees don't end up in the database
+    # so we really need the blockchain
+    port = request.environ["SERVER_PORT"] # already is a string
+    local_blockchain = BLOCKCHAIN_CLASS.load(get_chaindata_dir(port))
     address = request.args.get('address')
     confirmations = int(request.args.get('confirmations', '1'))
     confirmed_balance = local_blockchain.get_balance(address, confirmations)
@@ -118,7 +128,7 @@ def balance():
 # TODO: check this function
 @node.route('/confirmations', methods=['GET'])
 def confirmations():
-    update_blockchain()
+    # update_blockchain() - update is done in main_process
     uuid = request.args.get('transaction_id', "")
     if uuid == "":
         abort(400)

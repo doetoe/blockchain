@@ -210,7 +210,7 @@ def get_longest_blockchain(blockchain, node_address, active_peers):
             pass
     return longest_blockchain
     
-def start_mining(host, port, shared_dict, active_peers):
+def main_process(host, port, shared_dict, active_peers):
     """This is the main function, that executes in an infinite loop as long
     as this node is running."""
     chaindata_dir = get_chaindata_dir(port, create=True)
@@ -280,12 +280,12 @@ def start(opt, remaining, host, port, node_address, active_peers):
     find_peers(opt, remaining, node_address, active_peers)
     
     shared_dict["running"] = True
-
+    
     miner = Process(
-        target=start_mining,
+        target=main_process,
         args=(host, port, shared_dict, active_peers))
     miner.start()
-
+    
     print ("running node on %s" % (node_address))
     try:
         node.run(host=host, port=port)

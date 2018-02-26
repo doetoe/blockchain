@@ -5,11 +5,11 @@
 - all unprocessed transactions are served rather than just some number
 
 * To be done
-- Check mempool functionality in the extension of node in the file transactionnode.py
+- Test mempool functionality in the extension of node in the file transactionnode.py
 - like blockchain, synchronize transactions:
   - for each node, get unprocessed transactions (blockchain will synchronize soon enough to take care of differences in status), add to db (with block=NULL), set block index from local_blockchain (necessary?).
   - For the moment no effort is made to store the full historical mempool, processed transactions are already in the blockchain; alternatively could store transactions from the blockchain into the local mempool db, or broadcast and retrieve a full list of transactions.
-- remove double-spend transactions (maybe). Alternatively they could float around until the balance is high enough.
+- remove double-spend transactions (maybe). Alternatively they could float around until the balance is high enough to be executed.
 - Inherit TransactionBlockChain from BlockChain to override the "mine" function. Maybe also the TransactionBlock. In mining, unprocessed transactions should be retrieved from all or some peers, or only local store, which is separately updated, and bundled.
 - The TransactionBlockChain in its "mine" function has to have access to the mempool address or obtain unprocessed transactions in a different way. The "Node" right now is generic, which is good, but it could be that it needs to be different for a node processing transactions than for one validating basic blocks, and again for one that processes contracts. 
 - Maybe integrate mempool in a general node (in some elegant, flexible, extensible and configurable way)
@@ -42,6 +42,11 @@ Each node serves as a full node, a miner and a tracker. When it is started, it t
 It obtains a list of peers from each one of them, and registers with all running nodes.
 
 It then starts both mining, and operating a full node (serving the full blockchain) as well as peer-discovery services. In the future it should also provide mempool services.
+
+A parent process runs a web server. A child process maintains and updates
+- a set of peers
+- the blockchain
+- a database of all transactions
 
 * Operation
 - Start the tracker. 
