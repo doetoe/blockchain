@@ -100,14 +100,14 @@ class TransactionSynchronizer(Synchronizer):
                 txs = requests.get("http://%s/unprocessed" % peer).json()
             except requests.ConnectionError:
                 continue
-        for tx in txs:
-            # add transactions in the blockchain that are not in the database.
-            # This command may not be standard SQL, but it works in sqlite
-            self.db_connection.execute(
-                """insert or ignore into transactions values 
-                (:uuid, :from_addr, :to_addr, :amount, :fee, :msg, :signature, NULL)""",
-                tx.__dict__)
-        self.db_connection.commit()
+            for tx in txs:
+                # add transactions in the blockchain that are not in the database.
+                # This command may not be standard SQL, but it works in sqlite
+                self.db_connection.execute(
+                    """insert or ignore into transactions values 
+                    (:uuid, :from_addr, :to_addr, :amount, :fee, :msg, :signature, NULL)""",
+                    tx.__dict__)
+            self.db_connection.commit()
             
         self.__update_db_from_blockchain(blockchain, add_missing=True)
 

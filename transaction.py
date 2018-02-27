@@ -167,7 +167,7 @@ class TransactionBlockChain(BlockChain):
             self.get_balances()
         except AssertionError:
             return False
-        return super(TransactionBlockChain, self).is_valid()
+        return super(TransactionBlockChain, self).is_valid(difficulty)
     
     def get_balances(self, confirmations=1):
         """Returns a dictionary whose keys are all addresses appearing in the
