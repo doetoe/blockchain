@@ -94,12 +94,6 @@ class BlockChain(object):
     def next_index(self):
         return 0 if len(self) == 0 else self.head().index + 1
         
-    def next_block_data(self, node_address, active_peers):
-        """Assembles data for the next block. Before over call to mine() 
-        while a node is running, this function will be called to assemble
-        data to include in a block."""
-        return "Block #%s, mined by %s" % (self.next_index(), node_address)
-        
     def mine(self, data, difficulty, intents=1000):
         """Try to mine a next block for the given difficulty by computing 
         the specified number of hashes.

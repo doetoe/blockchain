@@ -45,7 +45,6 @@ node = Flask(__name__)
 active_peers = process_manager.dict()
 # Generic dictionary to be shared between processes
 shared_dict = process_manager.dict()
-node_address = None
 
 def timeout_peers():
     """Remove stale peers from the list of active peers"""
@@ -153,82 +152,115 @@ def chainlength(url):
     except:
         return -1
 
-def update_peers(node_address, active_peers, addresses=None):
-    """Add the addresses to the known peers (if specified), obtain all peers 
-    of known peers, check their status, register with the live ones, and 
-    update the set of known active peers.
+class Synchronizer(object):
     """
-    now = time.time()
+    In the main process an instance of the Synchronizer is passed. At the beginning
+    init(...) will be called once. Then in every mining iteration:
 
-    # candidate first level peers
-    peers1 = set(active_peers.keys())
-    if addresses:
-        peers1.update(addresses)
-    if node_address in peers1:
-        peers1.remove(node_address)
-
-    # candidate 2nd level peers
-    peers2 = set()
-    for peer1 in peers1:
-        try:
-            peers2.update(requests.get("http://%s/nodes" % peer1).json())
-            peers2.add(peer1)
-        except requests.ConnectionError:
-            print("%s not running" % peer1)
-            if peer1 in active_peers:
-                active_peers.pop(peer1)
-    if node_address in peers2:
-        peers2.remove(node_address)
-
-    for peer in peers2:
-        # if refreshed < 10 seconds ago, state is assumed to be unchanged
-        #if now - active_peers.get(peer,0) < 10 or running(peer):
-        try:
-            requests.get("http://%s/register" % peer, params={"url": node_address})
-            active_peers[peer] = now
-        except requests.ConnectionError:
-            print("Couldn't register with %s" % peer)
-            if peer in active_peers:
-                active_peers.pop(peer)
-
-    print("known peers: %s" % (active_peers.keys()))
-
-def get_longest_blockchain(blockchain, node_address, active_peers):
-    longest_blockchain = blockchain
-    for peer_address in active_peers.keys():
-        if peer_address == node_address: # the current node itself
-            continue
-        try:
-            if chainlength(peer_address) > len(longest_blockchain):
-                peer_blockchain = BLOCKCHAIN_CLASS.from_url(
-                    "http://%s/blockchain" % (peer_address))
-                if peer_blockchain.is_valid(DIFFICULTY) and \
-                   len(peer_blockchain) > len(longest_blockchain):
-                    longest_blockchain = peer_blockchain
-        except requests.ConnectionError:
-            print("Failed to obtain blockchain from %s" % peer_address)
-            pass
-    return longest_blockchain
+    update_peers(...)
+    get_longest_blockchain(...)
+    next_block_data(...)
+    """
+    def init(self, host, port, shared_dict, active_peers):
+        self.host = host
+        self.port = port
+        self.shared_dict = shared_dict
+        self.active_peers = active_peers
+        self.node_address = "%s:%d" % (host,port)
+    # def update(self, blockchain):
+    #     return
     
-def main_process(host, port, shared_dict, active_peers):
+    def update_peers(self, active_peers, addresses=None):
+        """Add the addresses to the known peers (if specified), obtain all peers 
+        of known peers, check their status, register with the live ones, and 
+        update the set of known active peers.
+        """
+        now = time.time()
+    
+        # candidate first level peers
+        peers1 = set(active_peers.keys())
+        if addresses:
+            peers1.update(addresses)
+        if self.node_address in peers1:
+            peers1.remove(self.node_address)
+    
+        # candidate 2nd level peers
+        peers2 = set()
+        for peer1 in peers1:
+            try:
+                peers2.update(requests.get("http://%s/nodes" % peer1).json())
+                peers2.add(peer1)
+            except requests.ConnectionError:
+                print("%s not running" % peer1)
+                if peer1 in active_peers:
+                    active_peers.pop(peer1)
+        if self.node_address in peers2:
+            peers2.remove(self.node_address)
+    
+        for peer in peers2:
+            # if refreshed < 10 seconds ago, state is assumed to be unchanged
+            #if now - active_peers.get(peer,0) < 10 or running(peer):
+            try:
+                requests.get("http://%s/register" % peer,
+                             params={"url": self.node_address})
+                active_peers[peer] = now
+            except requests.ConnectionError:
+                print("Couldn't register with %s" % peer)
+                if peer in active_peers:
+                    active_peers.pop(peer)
+    
+        print("known peers: %s" % (active_peers.keys()))
+
+    def get_longest_blockchain(self, blockchain, active_peers):
+        longest_blockchain = blockchain
+        for peer_address in active_peers.keys():
+            if peer_address == self.node_address: # the current node itself
+                continue
+            try:
+                if chainlength(peer_address) > len(longest_blockchain):
+                    peer_blockchain = BLOCKCHAIN_CLASS.from_url(
+                        "http://%s/blockchain" % (peer_address))
+                    if peer_blockchain.is_valid(DIFFICULTY) and \
+                       len(peer_blockchain) > len(longest_blockchain):
+                        longest_blockchain = peer_blockchain
+            except requests.ConnectionError:
+                print("Failed to obtain blockchain from %s" % peer_address)
+                pass
+        return longest_blockchain
+    
+    def next_block_data(self, blockchain, active_peers):
+        """Does all kind of node synchronization and other updates that
+        are needed, and finally returns a data object that is directly
+        passed to the mine() function of the blockchain."""
+        return "Block #%s, mined by %s" % (blockchain.next_index(), self.node_address)
+    
+def main_process(host, port, shared_dict, active_peers, synchronizer):
     """This is the main function, that executes in an infinite loop as long
-    as this node is running."""
+    as this node is running.
+    The synchronizer is any callable that will take care of updating 
+    everything before each call to the mining process 
+    (blockchain.next_block_data and blockchain.mine).
+    """
     chaindata_dir = get_chaindata_dir(port, create=True)
     blockchain = BLOCKCHAIN_CLASS.load(data_dir=chaindata_dir)
     assert blockchain.is_valid(DIFFICULTY)
 
+    # Already called in start(...)
+    # synchronizer.init(host, port, shared_dict, active_peers)
+    
     node_address = "%s:%d" % (host,port)
     while shared_dict["running"]: # stop mining when webserver is stopped
-        update_peers(node_address, active_peers)
+        synchronizer.update_peers(active_peers)
 
-        longest_blockchain = get_longest_blockchain(
-            blockchain, node_address, active_peers)
+        longest_blockchain = synchronizer.get_longest_blockchain(
+            blockchain, active_peers)
         if not longest_blockchain is blockchain:
             blockchain = longest_blockchain
             blockchain.save(chaindata_dir)
             
         print("Chain length = %d" % len(blockchain))
-        data = blockchain.next_block_data(node_address, active_peers)
+        # synchronizer.update(blockchain)
+        data = synchronizer.next_block_data(blockchain, active_peers)
         nextblock = blockchain.mine(data, DIFFICULTY, intents=1000)
         if nextblock is not None:
             blockchain.append(nextblock)
@@ -267,26 +299,26 @@ def get_host_port(opt):
 
     return host, port
 
-def find_peers(opt, remaining, node_address, active_peers):
-    update_peers(node_address, active_peers,
-                 TRACKER_ADDRESSES + remaining)
+def find_peers(opt, remaining, active_peers, synchronizer):
+    synchronizer.update_peers(active_peers, TRACKER_ADDRESSES + remaining)
     if not active_peers:
         print("No active nodes found. Going solo.")    
 
 # Run mining node at specified port, or, if no port is specified, look for
 # port that is free, probably one that has run before if available.
 # It will at the same time start mining and start broadcasting.
-def start(opt, remaining, host, port, node_address, active_peers):
-    find_peers(opt, remaining, node_address, active_peers)
+def start(opt, remaining, host, port, active_peers, synchronizer):
+    synchronizer.init(host, port, shared_dict, active_peers)
+    find_peers(opt, remaining, active_peers, synchronizer)
     
     shared_dict["running"] = True
     
     miner = Process(
         target=main_process,
-        args=(host, port, shared_dict, active_peers))
+        args=(host, port, shared_dict, active_peers, synchronizer))
     miner.start()
     
-    print ("running node on %s" % (node_address))
+    print ("running node on %s" % (synchronizer.node_address))
     try:
         node.run(host=host, port=port)
     except:
@@ -300,5 +332,4 @@ if __name__ == '__main__':
         sys.exit()
     
     host, port = get_host_port(opt)
-    node_address = "%s:%d" % (host,port)
-    start(opt, remaining, host, port, node_address, active_peers)
+    start(opt, remaining, host, port, active_peers, Synchronizer())

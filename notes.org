@@ -5,7 +5,9 @@
 - all unprocessed transactions are served rather than just some number
 
 * To be done
+- In node.py get rid of argument active_peers in favor of using self.active_peers
 - Test mempool functionality in the extension of node in the file transactionnode.py
+- In TransactionSynchronizer.next_block_data, create transactions for transaction bundle
 - like blockchain, synchronize transactions:
   - for each node, get unprocessed transactions (blockchain will synchronize soon enough to take care of differences in status), add to db (with block=NULL), set block index from local_blockchain (necessary?).
   - For the moment no effort is made to store the full historical mempool, processed transactions are already in the blockchain; alternatively could store transactions from the blockchain into the local mempool db, or broadcast and retrieve a full list of transactions.

@@ -169,15 +169,6 @@ class TransactionBlockChain(BlockChain):
             return False
         return super(TransactionBlockChain, self).is_valid()
     
-    def next_block_data(self, node_address, active_peers):
-        # get unprocessed transactions
-        try:
-            txs = requests.get("%s/unprocessed" % mempool_url).json()
-        except requests.ConnectionError:
-            return None
-        
-        raise NotImplementedError()
-    
     def get_balances(self, confirmations=1):
         """Returns a dictionary whose keys are all addresses appearing in the
         blockchain (including the miner_address), and whose values are the 
@@ -202,6 +193,12 @@ class TransactionBlockChain(BlockChain):
     
     def get_balance(self, address, confirmations=0):
         return self.get_balances(confirmations)[address]
+
+    # def mine(self, txs, difficulty, intents):
+    #     # txs can be of any type and is obtained as the return value of
+    #     # TransactionSynchronizer.next_block_data()
+    #     # When this is a string, the superclass implementation is fine.
+    #     raise NotImplementedError()
     
 # execute doctest when executed as a script
 # Displays output when passed -v or when a test fails

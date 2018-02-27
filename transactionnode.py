@@ -17,13 +17,13 @@ import os
 import getopt
 import sqlite3
 from flask import request
-from node import node, start, node_address, active_peers, \
-    get_nodedata_dir, helptext, get_host_port
+from node import node, start, active_peers, \
+    get_nodedata_dir, helptext, get_host_port, Synchronizer
 from transaction import Transaction
+from address import Address
 from config import BLOCKCHAIN_CLASS # should always be TransactionBlockChain or a subclass
 
 db_connection = None # sqlite3.connect("")
-local_blockchain = BLOCKCHAIN_CLASS()
 
 # @node.route('/test', methods=['GET'])
 # def test():
@@ -69,41 +69,57 @@ def unprocessed():
         list(transaction.__dict__
              for transaction in get_unprocessed(db_connection)))
 
-# Should get executed in main_process (child)
-def update_db_from_blockchain(blockchain, add_missing=False):
-    """Resets the block ID for each transaction in the mempool database"""
-    db_connection.execute(
-        "update transactions set block = NULL")
-    for block in blockchain:
-        for tx in block.get_transaction_bundle():
-            if add_missing:
-                # add transactions in the blockchain that are not in the
-                # database.
-                # This command may not be standard SQL, but it works in sqlite
-                db_connection.execute(
-                    """insert into transactions values 
-                    (:uuid, :from_addr, :to_addr, :amount, :fee, :msg, :signature, NULL)""",
-                    tx.__dict__)
-            db_connection.execute(
-                "update transactions set block = ? where uuid = ?",
-                (block.index, tx.uuid))
-    db_connection.commit()
+class TransactionSynchronizer(Synchronizer):
+    def __init__(self, db_connection, miner_address):
+        self.db_connection = db_connection
+        self.miner_address = miner_address
+        
+    def __update_db_from_blockchain(self, blockchain, add_missing=False):
+        """Resets the block ID for each transaction in the mempool database"""
+        self.db_connection.execute(
+            "update transactions set block = NULL")
+        for block in blockchain:
+            for tx in block.get_transaction_bundle():
+                if add_missing:
+                    # add transactions in the blockchain that are not in the
+                    # database.
+                    # This command may not be standard SQL, but it works in sqlite
+                    self.db_connection.execute(
+                        """insert or ignore into transactions values 
+                        (:uuid, :from_addr, :to_addr, :amount, :fee, :msg, :signature, NULL)""",
+                        tx.__dict__)
+                self.db_connection.execute(
+                    "update transactions set block = ? where uuid = ?",
+                    (block.index, tx.uuid))
+        self.db_connection.commit()
+        
+    def next_block_data(self, blockchain, active_peers):
+        # Add unprocessed transactions from all peers to database
+        for peer in active_peers:
+            try:
+                txs = requests.get("http://%s/unprocessed" % peer).json()
+            except requests.ConnectionError:
+                continue
+        for tx in txs:
+            # add transactions in the blockchain that are not in the database.
+            # This command may not be standard SQL, but it works in sqlite
+            self.db_connection.execute(
+                """insert or ignore into transactions values 
+                (:uuid, :from_addr, :to_addr, :amount, :fee, :msg, :signature, NULL)""",
+                tx.__dict__)
+        self.db_connection.commit()
+            
+        self.__update_db_from_blockchain(blockchain, add_missing=True)
 
-# def update_blockchain():
-#     """Update the locally stored version of the blockchain by querying the nodes
-#     and update the database from it."""
-#     # download/update blockchain
-#     # update_peers(node_address, active_peers) # -> not necessary
-#     longest_blockchain = get_longest_blockchain(
-#         local_blockchain, node_address, active_peers)
-#     # update transaction pool (database): mark/unmark blocks
-#     # Note that all existing transactions should in theory be in this database.
-#     # Could assume that the database is up to date w.r.t. the old blockchain and
-#     # only update for the newer blocks (on starting the mempool the validity will
-#     # be initialized from the blockchain)
-#     if not local_blockchain is longest_blockchain:
-#         local_blockchain = longest_blockchain
-#         update_db_from_blockchain(local_blockchain, False)
+        c = self.db_connection.execute(
+            """select uuid, from_addr, to_addr, amount, fee, msg, signature 
+            from transactions where block is NULL""")
+        transactions = [Transaction(
+            **dict(zip(["uuid", "from_addr", "to_addr",
+                        "amount", "fee", "msg", "signature"], data))) for data in c]
+        msg = "Mined by %s" % self.node_address
+        return TransactionBundle(msg, self.miner_address, transactions).as_json()
+    
 
 @node.route('/balance', methods=['GET'])
 def balance():
@@ -138,14 +154,20 @@ def confirmations():
     if block is None:
         return "0"
     else:
-        return str(len(local_blockchain) - block)
+        port = request.environ["SERVER_PORT"] # already is a string
+        chainlen = len(os.listdir(get_chaindata_dir(port)))
+        return str(chainlen - block)
 
 def get_database_dir(port, create=False):
     return get_nodedata_dir(port, "", create)
 
 def transaction_helptext(filename):
     return helptext(filename) + \
-        "-d <db>       transaction database (default transactions.db)"
+        """-d <db>       transaction database (default transactions.db)
+        -m <address>  miner address to send the fee and the block reward to
+                      (gets lost if unspecified, or actually goes to the 
+                      address created with seed 0)
+        """
 
 def get_db_connection(opt, port):
     """For a database filename db, create the database if it didn't
@@ -178,18 +200,18 @@ def get_db_connection(opt, port):
 if __name__ == '__main__':
     # options for transaction database. Take care of the unicity of filenames
     # for different nodes.
-    opt, remaining = getopt.getopt(sys.argv[1:], "hHp:t:d:")
+    opt, remaining = getopt.getopt(sys.argv[1:], "hHp:t:d:m:")
     opt = dict(opt)
     if "-h" in opt:
         print(transaction_helptext(os.path.basename(sys.argv[0])))
         sys.exit()
 
     host, port = get_host_port(opt)
-    node_address = "%s:%d" % (host,port)
+    miner_address = opt.get("-m", Address(seed="0").address)
         
-    local_blockchain = BLOCKCHAIN_CLASS()
     db_connection = get_db_connection(opt, port)
 
     # Start the node with tracker services and the new transaction services
     # as well as the mining process
-    start(opt, remaining, host, port, node_address, active_peers)
+    start(opt, remaining, host, port, active_peers,
+          TransactionSynchronizer(db_connection, miner_address))
