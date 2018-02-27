@@ -194,6 +194,10 @@ class Synchronizer(object):
                 print("%s not running" % peer1)
                 if peer1 in active_peers:
                     active_peers.pop(peer1)
+            except BaseException as e:
+                print("Unknown problem with %s: %s" % (peer1, e))
+                if peer1 in active_peers:
+                    active_peers.pop(peer1)
         if self.node_address in peers2:
             peers2.remove(self.node_address)
     
@@ -248,7 +252,6 @@ def main_process(host, port, shared_dict, active_peers, synchronizer):
     # Already called in start(...)
     # synchronizer.init(host, port, shared_dict, active_peers)
     
-    node_address = "%s:%d" % (host,port)
     while shared_dict["running"]: # stop mining when webserver is stopped
         synchronizer.update_peers(active_peers)
 

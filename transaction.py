@@ -76,6 +76,7 @@ class Transaction(object):
     
     @staticmethod
     def from_json(s):
+        print(s)
         return Transaction(**json.loads(s))
     
     def as_json(self):
@@ -159,6 +160,12 @@ class TransactionBlock(Block):
 
     
 class TransactionBlockChain(BlockChain):
+    @staticmethod
+    def new_block(*args, **kwargs):
+        """Contructs a block of a class compatible with this BlockChain class
+        with the specified arguments"""
+        return TransactionBlock(*args, **kwargs)
+        
     def is_valid(self, difficulty):
         # check balances, validity and unicity of transactions
         try:
