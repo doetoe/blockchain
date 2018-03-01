@@ -6,7 +6,6 @@ For this to works correctly you need the modules
 
 * block
 * blockchain
-* tracker
 * node
 * util
 * config
@@ -15,7 +14,6 @@ The next level adds *transactions* to this. Users can generate private keys and 
 
 For transactions to work correctly, you need the additional modules
 
-* mempool
 * transaction
 * address
 * user
