@@ -88,12 +88,12 @@ def register():
 def running():
     """This changed to return the blockchain class, so that you see if this
     peer runs the same type of block that you do."""
-    return str(node.chainclass)
+    return node.chainclass.__name__
 
 def get_nodedata_dir(port, dirname, blockchain_class, create=False):
     """The data directory for the client running at the specified port.
     When create=True, it will be created if it doesn't exist."""
-    data_dir = os.path.join(DATA_DIR, str(blockchain_class), str(port), dirname)
+    data_dir = os.path.join(DATA_DIR, blockchain_class.__name__, str(port), dirname)
     if create and not os.path.isdir(data_dir):
         os.makedirs(data_dir)
     return data_dir
@@ -175,7 +175,7 @@ class Synchronizer(object):
         """Returns whether a compatible node is running at this address."""
         address = "http://%s/running" % url
         try:
-            return requests.get(address).text == str(cls.chainclass)
+            return requests.get(address).text == cls.chainclass.__name__
         except:
             return False
     
