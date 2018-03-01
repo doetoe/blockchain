@@ -16,12 +16,16 @@ import sys
 import os
 import getopt
 import sqlite3
+import requests
+import json
 from flask import request
 from node import node, start, active_peers, \
     get_nodedata_dir, helptext, get_host_port, Synchronizer
-from transaction import Transaction
-from address import Address
-from config import BLOCKCHAIN_CLASS # should always be TransactionBlockChain or a subclass
+from transaction import Transaction, TransactionBundle
+from address import Address, could_be_valid_address
+# should always be TransactionBlockChain or a subclass
+from config import BLOCKCHAIN_CLASS, \
+    MAX_TRANSACTIONS_PER_BLOCK
 
 db_connection = None # sqlite3.connect("")
 
@@ -95,7 +99,8 @@ class TransactionSynchronizer(Synchronizer):
         
     def next_block_data(self, blockchain, active_peers):
         # Add unprocessed transactions from all peers to database
-        for peer in active_peers:
+        for peer in active_peers.keys(): # have to explictly loop over keys:
+                                         # does not exacly behave as dict
             try:
                 txs = requests.get("http://%s/unprocessed" % peer).json()
             except requests.ConnectionError:
@@ -108,24 +113,41 @@ class TransactionSynchronizer(Synchronizer):
                     (:uuid, :from_addr, :to_addr, :amount, :fee, :msg, :signature, NULL)""",
                     tx.__dict__)
             self.db_connection.commit()
-            
         self.__update_db_from_blockchain(blockchain, add_missing=True)
 
+        # c = self.db_connection.execute(
+        #     """select uuid, from_addr, to_addr, amount, fee, msg, signature 
+        #     from transactions where block is NULL order by fee desc limit ?""",
+        #     MAX_TRANSACTIONS_PER_BLOCK)
         c = self.db_connection.execute(
             """select uuid, from_addr, to_addr, amount, fee, msg, signature 
-            from transactions where block is NULL""")
-        transactions = [Transaction(
-            **dict(zip(["uuid", "from_addr", "to_addr",
-                        "amount", "fee", "msg", "signature"], data))) for data in c]
+            from transactions where block is NULL order by fee desc""")
+
+        balances = blockchain.get_balances()
+
+        transactions = []
+        for data in c:
+            tx = Transaction(
+                **dict(zip(["uuid", "from_addr", "to_addr",
+                            "amount", "fee", "msg", "signature"], data)))
+            if balances.get[tx.from_addr] >= tx.amount + tx.fee:
+                balances[tx.from_addr] -= tx.amount + tx.fee
+                balances[tx.to_addr] += tx.amount
+                transactions.append(tx)
+                
+            if len(transactions) >= MAX_TRANSACTIONS_PER_BLOCK:
+                break
+        
         msg = "Mined by %s" % self.node_address
         return TransactionBundle(msg, self.miner_address, transactions).as_json()
-    
+
 
 @node.route('/balance', methods=['GET'])
 def balance():
     # update_blockchain() - update is done in main_process
     # NOTE: block rewards and recipients of fees don't end up in the database
-    # so we really need the blockchain
+    # so we really need the blockchain. Note that the child process of this same
+    # node actually has the blockchain, but we don't use it.
     port = request.environ["SERVER_PORT"] # already is a string
     local_blockchain = BLOCKCHAIN_CLASS.load(get_chaindata_dir(port))
     address = request.args.get('address')
@@ -141,7 +163,6 @@ def balance():
             (address,)).fetchone()[0]
     return str(confirmed_balance + (received or 0) - (transferred or 0))
 
-# TODO: check this function
 @node.route('/confirmations', methods=['GET'])
 def confirmations():
     # update_blockchain() - update is done in main_process
@@ -166,7 +187,8 @@ def transaction_helptext(filename):
         """-d <db>       transaction database (default transactions.db)
         -m <address>  miner address to send the fee and the block reward to
                       (gets lost if unspecified, or actually goes to the 
-                      address created with seed 0)
+                      address created with seed "host:port"). Instead of an
+                      address, a seed may be passed.
         """
 
 def get_db_connection(opt, port):
@@ -195,7 +217,7 @@ def get_db_connection(opt, port):
     db_connection.execute(
         "update transactions set block = NULL")
     db_connection.commit()
-    
+    return db_connection
 
 if __name__ == '__main__':
     # options for transaction database. Take care of the unicity of filenames
@@ -207,8 +229,10 @@ if __name__ == '__main__':
         sys.exit()
 
     host, port = get_host_port(opt)
-    miner_address = opt.get("-m", Address(seed="0").address)
-        
+    miner_address = opt.get("-m", "%s:%d" % (host, port))
+    if not could_be_valid_address(miner_address):
+        miner_address = Address(seed=miner_address).address
+    
     db_connection = get_db_connection(opt, port)
 
     # Start the node with tracker services and the new transaction services

@@ -5,6 +5,7 @@
 - all unprocessed transactions are served rather than just some number
 
 * To be done
+- Only include valid transactions in mine()/next_block_data()
 - In node.py get rid of argument active_peers in favor of using self.active_peers
 - Test mempool functionality in the extension of node in the file transactionnode.py
 - In TransactionSynchronizer.next_block_data, create transactions for transaction bundle

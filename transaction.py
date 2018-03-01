@@ -180,10 +180,12 @@ class TransactionBlockChain(BlockChain):
         """Returns a dictionary whose keys are all addresses appearing in the
         blockchain (including the miner_address), and whose values are the 
         balances.
+        Actually a defaultdict that returns NEW_ADDRESS_BALANCE for new 
+        addresses (this should be 0 for any serious use of course).
         If a number of confirmations is passed, the balance is based only on
         transactions that have the specified number of confirmations, default 1,
         meaning anywhere in the chain (last block or earlier)."""
-        balances = defaultdict(lambda:0)
+        balances = defaultdict(lambda:NEW_ADDRESS_BALANCE)
         transaction_uuids = set()
         for block in self[:len(self) - confirmations + 1]:
             txs = block.get_transaction_bundle()

@@ -4,13 +4,20 @@ import sys
 import getopt
 import os
 import requests
+from random import random, randrange
+from util import multidict
 from address import Address, could_be_valid_address
 from transaction import Transaction
-from config import MEMPOOL_ADDRESS
+from config import NODE_ADDRESSES
 
 def showhelp(path):
     print("""Usage:
         {0} <cmd> [options] [args]
+
+        Some common options include:
+
+          -t <address>   Address of a (known) tracker (node). May be repeated.
+                         This will be added to a fixed list of possible nodes.
 
         where <cmd> can be:
 
@@ -20,24 +27,46 @@ def showhelp(path):
         - send <amount> <address>
 
           Options:
-          -s <seed>      the seed from which the address is deterministically generated
+          -s <seed>      the seed from which the (sending) address is 
+                         deterministically generated
           -f <file>      the file from which the Address object can be read
                          Either seed or file must be specified.
           -M <msg>       a message to include in the transaction. 
           -F <fee>       optional transaction fee.
 
-          A transaction for the specified amount is created and sent to the specified
-          address. If instead of an address a seed is passed for the generation of an
-          address, the address will be generated. If you pass a seed, make sure that
-          it doesn't have the form resembling a valid address (namely a hex string of
-          length 96).
+          A transaction for the specified amount is created and sent to the 
+          specified address. If instead of an address a seed is passed for the 
+          generation of an address, the address will be generated. 
+          The sender has to either specify an address with a seed or with a 
+          keyfile. When you pass a seed, make sure that it doesn't have the 
+          form resembling a valid address (namely a hex string of length 96).
         
         - address <seed>
 
           print the (public) address associated to the seed
 
+        - rnd 
+
+          -s <max-seed>  - generate seeds in the range 0..max-seed (default 100)
+          -n <num>       - number of random transactions (default 1)
+
     """.format(os.path.basename(path), MEMPOOL_ADDRESS))
 
+def send(tx, mempool_addresses):
+    success = []
+    for address in mempool_addresses:
+        try:
+            requests.put("http://%s/pushtx" % address, json=tx.as_json())
+            success.append(address)
+        except requests.ConnectionError as e:
+            print("Couldn't submit transaction to %s: %s" % (address, e))
+    if success:
+        print("Successfully submitted to %s" % (success))
+        print(tx)
+
+def get_mempool_addresses(opt):
+    return opt.get("-t", []) + NODE_ADDRESSES
+        
 if __name__ == "__main__":
     if len(sys.argv) == 1 or sys.argv[1] == "help" or sys.argv[1] == "-h":
         showhelp(sys.argv[0])
@@ -46,8 +75,8 @@ if __name__ == "__main__":
     cmd = sys.argv[1]
     
     if cmd == "send":
-        opt, remaining = getopt.getopt(sys.argv[2:], "s:f:H:M:F:")
-        opt = dict(opt)
+        opt, remaining = getopt.getopt(sys.argv[2:], "s:f:M:F:t:")
+        opt = multidict(opt)
         s,f = "-s" in opt, "-f" in opt
         assert len(remaining) == 2, "two arguments required: amount and address"
         assert s and not f or f and not s, \
@@ -56,7 +85,6 @@ if __name__ == "__main__":
         dest = remaining[1]
         if not could_be_valid_address(dest):
             dest = Address(seed=dest).address
-        mempool_address = opt.get("-t", MEMPOOL_ADDRESS)
         if "-s" in opt:
             address = Address(seed=opt["-s"])
         else:
@@ -65,16 +93,27 @@ if __name__ == "__main__":
         fee = opt.get("-F", 0)
         tx = Transaction(address.address, dest, amount, fee, msg)
         tx.sign(address)
-        mempool_url = "http://%s" % (mempool_address)
-        try:
-            requests.put("%s/pushtx" % mempool_url, json=tx.as_json())
-            print("Submitted:")
-            print(tx)
-        except requests.ConnectionError as e:
-            print("Couldn't submit transaction: %s" % e)
+        send(tx, get_mempool_addresses(opt))
     elif cmd == "address":
         opt, remaining = getopt.getopt(sys.argv[2:], "")
         print(Address(seed=remaining[0]).address)
+    elif cmd == "rnd":
+        opt, remaining = getopt.getopt(sys.argv[2:], "n:s:t:")
+        opt = multidict(opt)
+        n = int(opt.get("-n", 1))
+        max_seed = int(opt.get("-s", 100))
+        for i in range(n):
+            seed_from = str(randrange(max_seed))
+            seed_to = str(randrange(max_seed))
+            source = Address(seed=seed_from)
+            dest = Address(seed=seed_to)
+            amount = random()
+            fee = amount * 0.1 * random()
+            msg = "randomly generated transaction from seed %s to seed %s" \
+                  % (seed_from, seed_to)
+            tx = Transaction(source.address, dest.address, amount, fee, msg)
+            tx.sign(source)
+            send(tx, get_mempool_addresses(opt))
     else:
         print("Command '%s' not recognized" % cmd)
         sys.exit()

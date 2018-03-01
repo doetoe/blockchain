@@ -25,8 +25,8 @@ and
 """
 
 from blockchain import BlockChain
-from config import DIFFICULTY, DATA_DIR, TRACKER_ADDRESSES, \
-    BLOCKCHAIN_CLASS, LEASE_TIME
+from config import DIFFICULTY, DATA_DIR, NODE_ADDRESSES, \
+    BLOCKCHAIN_CLASS
 from util import port_is_free
 from flask import Flask, request, abort, escape
 import requests
@@ -92,7 +92,7 @@ def running():
 def get_nodedata_dir(port, dirname, create=False):
     """The data directory for the client running at the specified port.
     When create=True, it will be created if it doesn't exist."""
-    data_dir = os.path.join(DATA_DIR, str(port), dirname)
+    data_dir = os.path.join(DATA_DIR, str(BLOCKCHAIN_CLASS), str(port), dirname)
     if create and not os.path.isdir(data_dir):
         os.makedirs(data_dir)
     return data_dir
@@ -166,7 +166,11 @@ class Synchronizer(object):
         self.port = port
         self.shared_dict = shared_dict
         self.active_peers = active_peers
-        self.node_address = "%s:%d" % (host,port)
+
+    @property
+    def node_address(self):
+        return "%s:%d" % (self.host, self.port)
+        
     # def update(self, blockchain):
     #     return
     
@@ -303,7 +307,7 @@ def get_host_port(opt):
     return host, port
 
 def find_peers(opt, remaining, active_peers, synchronizer):
-    synchronizer.update_peers(active_peers, TRACKER_ADDRESSES + remaining)
+    synchronizer.update_peers(active_peers, NODE_ADDRESSES + remaining)
     if not active_peers:
         print("No active nodes found. Going solo.")    
 
