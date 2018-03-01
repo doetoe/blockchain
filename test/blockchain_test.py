@@ -25,7 +25,6 @@ def suite(top_dir=None):
     #    for test in [TestCase1, ...]]
     unittestsuites = [unittest.defaultTestLoader.discover(
         testpath, pattern='test*.py', top_level_dir=top_dir)]
-    print(unittestsuites)
 
     doctests = [block, transaction, address]
     doctestsuites = [doctest.DocTestSuite(test, optionflags=

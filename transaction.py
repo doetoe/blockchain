@@ -194,7 +194,8 @@ class TransactionBlockChain(BlockChain):
                 transaction_uuids.add(tx.uuid)
                 balances[tx.from_addr] -= (tx.fee + tx.amount)
                 balances[tx.to_addr] += tx.amount
-                balances[txs.miner_address] += (tx.fee + BLOCK_REWARD)
+                balances[txs.miner_address] += tx.fee
+            balances[txs.miner_address] += BLOCK_REWARD
             assert all([balance >= 0 for balance in balances.values()]), \
                 "Negative balances in block %d" % block.index
         return balances

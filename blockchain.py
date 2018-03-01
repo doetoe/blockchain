@@ -66,7 +66,7 @@ class BlockChain(object):
                 return False
             if not prev_block.is_valid_predecessor(block):
                 return False
-        return True
+        return self.blocks[0].satisfies_pow(difficulty) and self.blocks[0].is_valid()
   
     def save(self, data_dir):
         """
