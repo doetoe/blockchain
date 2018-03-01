@@ -63,10 +63,10 @@ All services can be directly accessed through http, but this client makes it eas
 * send              - send a transaction
 * address           - see public address
 * rnd               - to send random transactions to a node
+* balance           - show balance(s)
 
 The following are still to be implemented:
 
-* balance           
 * create-address    - create an address and save it to a .pem file.
 
 ### Objectives ###
