@@ -8,7 +8,7 @@ from address import verify_signature
 from collections import defaultdict
 from block import Block
 from blockchain import BlockChain
-from config import BLOCK_REWARD, MAX_TRANSACTIONS_PER_BLOCK
+from config import BLOCK_REWARD, MAX_TRANSACTIONS_PER_BLOCK, NEW_ADDRESS_BALANCE
 
 class Transaction(object):
     """
@@ -195,7 +195,7 @@ class TransactionBlockChain(BlockChain):
                 transaction_uuids.add(tx.uuid)
                 balances[tx.from_addr] -= (tx.fee + tx.amount)
                 balances[tx.to_addr] += tx.amount
-                balances[txx.miner_address] += (tx.fee + BLOCK_REWARD)
+                balances[txs.miner_address] += (tx.fee + BLOCK_REWARD)
             assert all([balance >= 0 for balance in balances.values()]), \
                 "Negative balances in block %d" % block.index
         return balances

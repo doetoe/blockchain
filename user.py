@@ -59,13 +59,16 @@ def send(tx, mempool_addresses):
             requests.put("http://%s/pushtx" % address, json=tx.as_json())
             success.append(address)
         except requests.ConnectionError as e:
-            print("Couldn't submit transaction to %s: %s" % (address, e))
+            print("Couldn't submit transaction to %s" % (address))
     if success:
         print("Successfully submitted to %s" % (success))
         print(tx)
 
 def get_mempool_addresses(opt):
-    return opt.get("-t", []) + NODE_ADDRESSES
+    addresses = opt.get("-t", [])
+    if not isinstance(addresses, list):
+        addresses = [addresses]
+    return addresses + NODE_ADDRESSES
         
 if __name__ == "__main__":
     if len(sys.argv) == 1 or sys.argv[1] == "help" or sys.argv[1] == "-h":

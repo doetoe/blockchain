@@ -5,26 +5,16 @@
 - all unprocessed transactions are served rather than just some number
 
 * To be done
-- Only include valid transactions in mine()/next_block_data()
 - In node.py get rid of argument active_peers in favor of using self.active_peers
 - Test mempool functionality in the extension of node in the file transactionnode.py
-- In TransactionSynchronizer.next_block_data, create transactions for transaction bundle
-- like blockchain, synchronize transactions:
-  - for each node, get unprocessed transactions (blockchain will synchronize soon enough to take care of differences in status), add to db (with block=NULL), set block index from local_blockchain (necessary?).
-  - For the moment no effort is made to store the full historical mempool, processed transactions are already in the blockchain; alternatively could store transactions from the blockchain into the local mempool db, or broadcast and retrieve a full list of transactions.
 - remove double-spend transactions (maybe). Alternatively they could float around until the balance is high enough to be executed.
-- Inherit TransactionBlockChain from BlockChain to override the "mine" function. Maybe also the TransactionBlock. In mining, unprocessed transactions should be retrieved from all or some peers, or only local store, which is separately updated, and bundled.
-- The TransactionBlockChain in its "mine" function has to have access to the mempool address or obtain unprocessed transactions in a different way. The "Node" right now is generic, which is good, but it could be that it needs to be different for a node processing transactions than for one validating basic blocks, and again for one that processes contracts. 
-- Maybe integrate mempool in a general node (in some elegant, flexible, extensible and configurable way)
-- In node, tracker, mempool, better separate core functionality from network operations if possible (maybe in component classes)
-- Wallet class, AddressBook etc - not important
 - balance (user): allow incomplete address (prefix, as long as it is unique)
-- blocks of transactions
 - In validity check of blockchains containing transactions make sure that the balance is never negative. New function in transaction.py
 - Good tests for web services
-- fees and block reward go to miner_address
-- Instead of a mempool could have all nodes implement the services of the mempool, and synchronize the mempool between them
 - deal with wrong nodes in an elegant way
+- confirm that an existing database connection can be forked (this is done)
+- balances web service doesn't work, maybe none of the funcionality works
+- Wallet class, AddressBook etc - not important
 
 * Validity of a block
 - correct format

@@ -25,8 +25,7 @@ and
 """
 
 from blockchain import BlockChain
-from config import DIFFICULTY, DATA_DIR, NODE_ADDRESSES, \
-    BLOCKCHAIN_CLASS
+from config import DIFFICULTY, DATA_DIR, NODE_ADDRESSES
 from util import port_is_free
 from flask import Flask, request, abort, escape
 import requests
@@ -87,18 +86,20 @@ def register():
 
 @node.route('/running', methods=['GET'])
 def running():
-    return "running"
+    """This changed to return the blockchain class, so that you see if this
+    peer runs the same type of block that you do."""
+    return str(node.chainclass)
 
-def get_nodedata_dir(port, dirname, create=False):
+def get_nodedata_dir(port, dirname, blockchain_class, create=False):
     """The data directory for the client running at the specified port.
     When create=True, it will be created if it doesn't exist."""
-    data_dir = os.path.join(DATA_DIR, str(BLOCKCHAIN_CLASS), str(port), dirname)
+    data_dir = os.path.join(DATA_DIR, str(blockchain_class), str(port), dirname)
     if create and not os.path.isdir(data_dir):
         os.makedirs(data_dir)
     return data_dir
 
-def get_chaindata_dir(port, create=False):
-    return get_nodedata_dir(port, "chaindata", create)
+def get_chaindata_dir(port, blockchain_class, create=False):
+    return get_nodedata_dir(port, "chaindata", blockchain_class, create)
     
 @node.route('/blockchain', methods=['GET'])
 def blockchain():
@@ -106,7 +107,7 @@ def blockchain():
     Loads the blockchain from disk and serves it as a json list of dictionaries.
     """
     port = request.environ["SERVER_PORT"] # already is a string
-    ret = BLOCKCHAIN_CLASS.load(get_chaindata_dir(port)).as_json()
+    ret = node.chainclass.load(get_chaindata_dir(port, node.chainclass)).as_json()
     return ret
 
 @node.route('/chainlength', methods=['GET'])
@@ -114,7 +115,7 @@ def chainlength():
     """Note that the indexing starts at 0, so if the length is n, the next
     block to mine is block n."""
     port = request.environ["SERVER_PORT"]
-    return str(len(os.listdir(get_chaindata_dir(port))))
+    return str(len(os.listdir(get_chaindata_dir(port, node.chainclass))))
     
 @node.route('/block', methods=['GET'])
 def block():
@@ -131,19 +132,12 @@ def block():
     index = int(request.args.get('index'))
     # find out what port you are running on: that is the directory name
     port = request.environ["SERVER_PORT"]
-    filename = os.path.join(get_chaindata_dir(port), "%06d.json" % index)
+    filename = os.path.join(get_chaindata_dir(port, node.chainclass),
+                            "%06d.json" % index)
     if not os.path.isfile(filename):
         abort(400)
     with open(filename, 'r') as block_file:
         return block_file.read()
-
-def running(url):
-    """Returns whether a node is running at this address."""
-    address = "http://%s/running" % url
-    try:
-        return requests.get(address).text == "running"
-    except:
-        return False
 
 def chainlength(url):
     address = "http://%s/chainlength" % url
@@ -161,18 +155,29 @@ class Synchronizer(object):
     get_longest_blockchain(...)
     next_block_data(...)
     """
+    chainclass = BlockChain
+    
     def init(self, host, port, shared_dict, active_peers):
         self.host = host
         self.port = port
         self.shared_dict = shared_dict
-        self.active_peers = active_peers
-
+        self.active_peers = active_peers    
+        
     @property
     def node_address(self):
         return "%s:%d" % (self.host, self.port)
         
     # def update(self, blockchain):
     #     return
+
+    @classmethod
+    def running(cls, url):
+        """Returns whether a compatible node is running at this address."""
+        address = "http://%s/running" % url
+        try:
+            return requests.get(address).text == str(cls.chainclass)
+        except:
+            return False
     
     def update_peers(self, active_peers, addresses=None):
         """Add the addresses to the known peers (if specified), obtain all peers 
@@ -191,6 +196,8 @@ class Synchronizer(object):
         # candidate 2nd level peers
         peers2 = set()
         for peer1 in peers1:
+            if not self.running(peer1):
+                continue
             try:
                 peers2.update(requests.get("http://%s/nodes" % peer1).json())
                 peers2.add(peer1)
@@ -226,7 +233,7 @@ class Synchronizer(object):
                 continue
             try:
                 if chainlength(peer_address) > len(longest_blockchain):
-                    peer_blockchain = BLOCKCHAIN_CLASS.from_url(
+                    peer_blockchain = blockchain.from_url(
                         "http://%s/blockchain" % (peer_address))
                     if peer_blockchain.is_valid(DIFFICULTY) and \
                        len(peer_blockchain) > len(longest_blockchain):
@@ -241,6 +248,13 @@ class Synchronizer(object):
         are needed, and finally returns a data object that is directly
         passed to the mine() function of the blockchain."""
         return "Block #%s, mined by %s" % (blockchain.next_index(), self.node_address)
+
+    def load_blockchain(self, chaindata_dir):
+        """Loads the blockchain and returns it. Raises exception if it
+        isn't valid."""
+        blockchain = self.chainclass.load(data_dir=chaindata_dir)
+        assert blockchain.is_valid(DIFFICULTY)
+        return blockchain
     
 def main_process(host, port, shared_dict, active_peers, synchronizer):
     """This is the main function, that executes in an infinite loop as long
@@ -249,9 +263,8 @@ def main_process(host, port, shared_dict, active_peers, synchronizer):
     everything before each call to the mining process 
     (blockchain.next_block_data and blockchain.mine).
     """
-    chaindata_dir = get_chaindata_dir(port, create=True)
-    blockchain = BLOCKCHAIN_CLASS.load(data_dir=chaindata_dir)
-    assert blockchain.is_valid(DIFFICULTY)
+    chaindata_dir = get_chaindata_dir(port, synchronizer.chainclass, create=True)
+    blockchain = synchronizer.load_blockchain(chaindata_dir)
 
     # Already called in start(...)
     # synchronizer.init(host, port, shared_dict, active_peers)
@@ -337,6 +350,7 @@ if __name__ == '__main__':
     if "-h" in opt:
         print(helptext(os.path.basename(argv[0])))
         sys.exit()
-    
+
+    node.chainclass = BlockChain
     host, port = get_host_port(opt)
     start(opt, remaining, host, port, active_peers, Synchronizer())

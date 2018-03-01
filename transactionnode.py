@@ -21,11 +21,10 @@ import json
 from flask import request
 from node import node, start, active_peers, \
     get_nodedata_dir, helptext, get_host_port, Synchronizer
-from transaction import Transaction, TransactionBundle
+from transaction import Transaction, TransactionBundle, TransactionBlockChain
 from address import Address, could_be_valid_address
 # should always be TransactionBlockChain or a subclass
-from config import BLOCKCHAIN_CLASS, \
-    MAX_TRANSACTIONS_PER_BLOCK
+from config import MAX_TRANSACTIONS_PER_BLOCK
 
 db_connection = None # sqlite3.connect("")
 
@@ -74,6 +73,8 @@ def unprocessed():
              for transaction in get_unprocessed(db_connection)))
 
 class TransactionSynchronizer(Synchronizer):
+    chainclass = TransactionBlockChain
+
     def __init__(self, db_connection, miner_address):
         self.db_connection = db_connection
         self.miner_address = miner_address
@@ -111,7 +112,7 @@ class TransactionSynchronizer(Synchronizer):
                 self.db_connection.execute(
                     """insert or ignore into transactions values 
                     (:uuid, :from_addr, :to_addr, :amount, :fee, :msg, :signature, NULL)""",
-                    tx.__dict__)
+                    tx)
             self.db_connection.commit()
         self.__update_db_from_blockchain(blockchain, add_missing=True)
 
@@ -130,7 +131,7 @@ class TransactionSynchronizer(Synchronizer):
             tx = Transaction(
                 **dict(zip(["uuid", "from_addr", "to_addr",
                             "amount", "fee", "msg", "signature"], data)))
-            if balances.get[tx.from_addr] >= tx.amount + tx.fee:
+            if balances[tx.from_addr] >= tx.amount + tx.fee:
                 balances[tx.from_addr] -= tx.amount + tx.fee
                 balances[tx.to_addr] += tx.amount
                 transactions.append(tx)
@@ -149,7 +150,7 @@ def balance():
     # so we really need the blockchain. Note that the child process of this same
     # node actually has the blockchain, but we don't use it.
     port = request.environ["SERVER_PORT"] # already is a string
-    local_blockchain = BLOCKCHAIN_CLASS.load(get_chaindata_dir(port))
+    local_blockchain = node.chainclass.load(get_chaindata_dir(port))
     address = request.args.get('address')
     confirmations = int(request.args.get('confirmations', '1'))
     confirmed_balance = local_blockchain.get_balance(address, confirmations)
@@ -180,7 +181,7 @@ def confirmations():
         return str(chainlen - block)
 
 def get_database_dir(port, create=False):
-    return get_nodedata_dir(port, "", create)
+    return get_nodedata_dir(port, "", TransactionBlockChain, create)
 
 def transaction_helptext(filename):
     return helptext(filename) + \
@@ -228,6 +229,8 @@ if __name__ == '__main__':
         print(transaction_helptext(os.path.basename(sys.argv[0])))
         sys.exit()
 
+    node.chainclass = TransactionBlockChain
+    
     host, port = get_host_port(opt)
     miner_address = opt.get("-m", "%s:%d" % (host, port))
     if not could_be_valid_address(miner_address):
