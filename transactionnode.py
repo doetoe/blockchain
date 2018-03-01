@@ -7,7 +7,8 @@ provides mempool services (receive and broadcast transactions):
 
 /pushtx(tx)       # post transaction in json format
 /unprocessed      # json of all unprocessed transactions
-/balance(address)
+/balance(address) # return balance of given address (pending/confirmed)
+/balances(prefix) # return balances of all addresses with the given prefix
 /confirmations(transaction_id)
 
 """
@@ -20,7 +21,7 @@ import requests
 import json
 from flask import request
 from node import node, start, active_peers, \
-    get_nodedata_dir, helptext, get_host_port, Synchronizer
+    get_nodedata_dir, get_chaindata_dir, helptext, get_host_port, Synchronizer
 from transaction import Transaction, TransactionBundle, TransactionBlockChain
 from address import Address, could_be_valid_address
 # should always be TransactionBlockChain or a subclass
@@ -150,7 +151,7 @@ def balance():
     # so we really need the blockchain. Note that the child process of this same
     # node actually has the blockchain, but we don't use it.
     port = request.environ["SERVER_PORT"] # already is a string
-    local_blockchain = node.chainclass.load(get_chaindata_dir(port))
+    local_blockchain = node.chainclass.load(get_chaindata_dir(port, node.chainclass))
     address = request.args.get('address')
     confirmations = int(request.args.get('confirmations', '1'))
     confirmed_balance = local_blockchain.get_balance(address, confirmations)
@@ -163,6 +164,29 @@ def balance():
             "select sum(amount) + sum(fee) from transactions where from_addr=? and block is NULL;",
             (address,)).fetchone()[0]
     return str(confirmed_balance + (received or 0) - (transferred or 0))
+
+@node.route('/balances', methods=['GET'])
+def balances():
+    """All balances, or only those starting with a certain prefix"""
+    port = request.environ["SERVER_PORT"] # already is a string
+    local_blockchain = node.chainclass.load(get_chaindata_dir(port, node.chainclass))
+    prefix = request.args.get('prefix',"")
+    confirmations = int(request.args.get('confirmations', '1'))
+    all_confirmed_balances = local_blockchain.get_balances(confirmations)
+    selected_balances = all_confirmed_balances if not prefix \
+                        else dict(balance for balance in all_confirmed_balances.items()
+                                   if balance[0].startswith(prefix))
+    if confirmations == 0: # also consider unprocessed transactions
+        received, transferred = None, None
+        for address in selected_balances:
+            received = db_connection.execute(
+                "select sum(amount) from transactions where to_addr=? and block is NULL;",
+                (address,)).fetchone()[0]
+            transferred = db_connection.execute(
+                "select sum(amount) + sum(fee) from transactions where from_addr=? and block is NULL;",
+                (address,)).fetchone()[0]
+            selected_balances[address] += ((received or 0) - (transferred or 0))
+    return json.dumps(selected_balances)
 
 @node.route('/confirmations', methods=['GET'])
 def confirmations():
@@ -177,7 +201,7 @@ def confirmations():
         return "0"
     else:
         port = request.environ["SERVER_PORT"] # already is a string
-        chainlen = len(os.listdir(get_chaindata_dir(port)))
+        chainlen = len(os.listdir(get_chaindata_dir(port, node.chainclass)))
         return str(chainlen - block)
 
 def get_database_dir(port, create=False):

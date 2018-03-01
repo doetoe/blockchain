@@ -53,6 +53,7 @@ These support the same functionality and network services as node.py nodes, but 
 * /unprocessed      - json of all unprocessed transactions
 * /balance(address) - the balance for this address. Optionally can specify the number confirmations you want using confirmations=<n>. 
 		      1 means transactions anywhere in the blockchain, 0 means including unprocessed transactions.
+* /balances(prefix) - like balance, but for all addresses with the given prefix. If prefix is omitted, all addresses.
 * /confirmations(transaction_id)  - how many confirmations does the specified transaction have
 
 ##### Run user.py to use the network
@@ -61,12 +62,12 @@ All services can be directly accessed through http, but this client makes it eas
 
 * send              - send a transaction
 * address           - see public address
+* rnd               - to send random transactions to a node
 
 The following are still to be implemented:
 
 * balance           
-* rnd               - to send random transactions to a node
-* create-address
+* create-address    - create an address and save it to a .pem file.
 
 ### Objectives ###
 

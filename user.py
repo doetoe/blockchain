@@ -45,6 +45,11 @@ def showhelp(path):
 
           print the (public) address associated to the seed
 
+        - balance [prefix]
+
+          Show the balance of all addresses that start with the specified prefix. 
+          All addresses if prefix is omitted.
+
         - rnd 
 
           -s <max-seed>  - generate seeds in the range 0..max-seed (default 100)
@@ -52,9 +57,9 @@ def showhelp(path):
 
     """.format(os.path.basename(path), MEMPOOL_ADDRESS))
 
-def send(tx, mempool_addresses):
+def send(tx, node_addresses):
     success = []
-    for address in mempool_addresses:
+    for address in node_addresses:
         try:
             requests.put("http://%s/pushtx" % address, json=tx.as_json())
             success.append(address)
@@ -64,7 +69,7 @@ def send(tx, mempool_addresses):
         print("Successfully submitted to %s" % (success))
         print(tx)
 
-def get_mempool_addresses(opt):
+def get_node_addresses(opt):
     addresses = opt.get("-t", [])
     if not isinstance(addresses, list):
         addresses = [addresses]
@@ -96,10 +101,28 @@ if __name__ == "__main__":
         fee = opt.get("-F", 0)
         tx = Transaction(address.address, dest, amount, fee, msg)
         tx.sign(address)
-        send(tx, get_mempool_addresses(opt))
+        send(tx, get_node_addresses(opt))
     elif cmd == "address":
         opt, remaining = getopt.getopt(sys.argv[2:], "")
+        opt = multidict(opt)
         print(Address(seed=remaining[0]).address)
+    elif cmd == "balance":
+        opt, remaining = getopt.getopt(sys.argv[2:], "t:")
+        opt = multidict(opt)
+        prefix = "" if not remaining else remaining[0]
+        balances = None
+        for node in get_node_addresses(opt):
+            try:
+                balances = requests.get("http://%s/balances" % node,
+                                        params={"prefix": prefix}).json()
+                break
+            except requests.ConnectionError:
+                continue
+        if balances is None:
+            print("Could not connect to any node")
+        else:
+            for balance in balances.items():
+                print("%s: %.6f" % balance)
     elif cmd == "rnd":
         opt, remaining = getopt.getopt(sys.argv[2:], "n:s:t:")
         opt = multidict(opt)
@@ -116,7 +139,7 @@ if __name__ == "__main__":
                   % (seed_from, seed_to)
             tx = Transaction(source.address, dest.address, amount, fee, msg)
             tx.sign(source)
-            send(tx, get_mempool_addresses(opt))
+            send(tx, get_node_addresses(opt))
     else:
         print("Command '%s' not recognized" % cmd)
         sys.exit()
