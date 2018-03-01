@@ -76,7 +76,6 @@ class Transaction(object):
     
     @staticmethod
     def from_json(s):
-        print(s)
         return Transaction(**json.loads(s))
     
     def as_json(self):
@@ -200,7 +199,7 @@ class TransactionBlockChain(BlockChain):
                 "Negative balances in block %d" % block.index
         return balances
     
-    def get_balance(self, address, confirmations=0):
+    def get_balance(self, address, confirmations=1):
         return self.get_balances(confirmations)[address]
 
     # def mine(self, txs, difficulty, intents):

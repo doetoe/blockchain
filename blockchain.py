@@ -7,7 +7,7 @@ import glob
 import datetime
 
 class BlockChain(object):
-    def __init__(self, blocks=None, data_dir=None, json_string=None):
+    def __init__(self, blocks=None): # , data_dir=None, json_string=None):
         assert blocks is None or isinstance(blocks, list)
         self.blocks = blocks or []
 

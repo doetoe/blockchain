@@ -17,7 +17,7 @@ def calculate_hash(index, prev_hash, data, timestamp, nonce):
     return sha.hexdigest()
 
 class Block(object):
-    def __init__(self, index, timestamp, prev_hash=None, hash=None,
+    def __init__(self, index, timestamp=None, prev_hash=None, hash=None,
                  data="", nonce=None):
         """
         Properties:
@@ -32,6 +32,8 @@ class Block(object):
         deserialized from json format for interoperability with other languages.
         """
         self.index = index
+        if timestamp is None:
+            timestamp = datetime.datetime.utcnow()
         if isinstance(timestamp, datetime.datetime):
             timestamp = timestamp.isoformat()
         self.timestamp = timestamp
