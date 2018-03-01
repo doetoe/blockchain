@@ -6,14 +6,11 @@
 
 * To be done
 - In node.py get rid of argument active_peers in favor of using self.active_peers
-- Test mempool functionality in the extension of node in the file transactionnode.py
 - remove double-spend transactions (maybe). Alternatively they could float around until the balance is high enough to be executed.
-- balance (user): allow incomplete address (prefix, as long as it is unique)
-- In validity check of blockchains containing transactions make sure that the balance is never negative. New function in transaction.py
 - Good tests for web services
+- Better tests in general
 - deal with wrong nodes in an elegant way
-- confirm that an existing database connection can be forked (this is done)
-- balances web service doesn't work, maybe none of the funcionality works
+- confirm that it is OK to fork an existing database connection (this is done in transactionnode.py)
 - Wallet class, AddressBook etc - not important
 
 * Validity of a block
