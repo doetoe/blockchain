@@ -2,7 +2,7 @@
 
 The lowest level system consists of a network of *nodes* that mindlessly mine data blocks satisfying a proof-of-work and forming a *blockchain*, and synchronize these among each other.
 
-For this to works correctly you need the modules
+For this to work correctly you need the modules
 
 * block
 * blockchain
@@ -10,7 +10,7 @@ For this to works correctly you need the modules
 * util
 * config
 
-The next level adds *transactions* to this. Users can generate private keys and addresses and send transaction to an additional kind of node called a *mempool*, representing the *global transaction mempool*. Nodes can pull unprocessed transactions from it and include them in their blocks. For inclusion the nodes should check for additional validity: balances must be non-negative at any point in the blockchain.
+The next level adds *transactions* to this. Users can generate private keys and addresses and send transactions to an additional kind of node called a *TransactionNode*. The totality of unprocessed transactions forms the *global transaction mempool*. Nodes can pull unprocessed transactions from it and include them in their blocks. For inclusion the nodes should check for additional validity: balances must be non-negative at any point in the blockchain.
 
 For transactions to work correctly, you need the additional modules
 
@@ -19,9 +19,19 @@ For transactions to work correctly, you need the additional modules
 * user
 * transactionnode
 
-and you should change the configuration file `config.py` to specify the correct blockchain class.
-
 The third level adds general purpose executable data to this. This is still very much to be done and understood.
+
+### Configuration ###
+
+The local configuration is in `config.py`. It is a Python module that contains the following values:
+
+* `DATA_DIR`         -- This is where all local data (locally known transactions, locally cached transaction database) are stored. When it is erased, no functionality is lost, only data, which will be reconstructed if they were known to the remained of the network.
+* `NODE_ADDRESSES`   -- Some addresses to try to find peers. This list can be extended with command line arguments when running the node.
+* `DIFFICULTY`       -- The number of leading zeros a hash must have to be considered to have satisfied a proof of work. At present this is not dynamically updated based on the network's processing power.
+* `CONFIRMATIONS`    -- The number of blocks that should be mined after a block a transaction is contained in to be considered validated.
+* `BLOCK_REWARD`     -- The number of coins awarded to the miner that creates a block.
+* `MAX_TRANSACTIONS_PER_BLOCK`  -- The maximal number of transactions that can be included in a single block.
+* `NEW_ADDRESS_BALANCE`  -- The amount that is automatically awarded to a new address. Since everybody can create an unlimited number of addresses, when not setting up a network for testing, the only sensible value is 0.
 
 ### Operation ###
 
@@ -82,5 +92,4 @@ All this runs in Python 3, though Python 2 should work with some minor changes. 
 doetoe@protonmail.com
 
 ### Credits ###
-
-The initial inspiration came from [this tutorial](https://bigishdata.com/2017/10/17/write-your-own-blockchain-part-1-creating-storing-syncing-displaying-mining-and-proving-work/).
+This is a greatly improved and extended version of what was initially loosely based on [this tutorial](https://bigishdata.com/2017/10/17/write-your-own-blockchain-part-1-creating-storing-syncing-displaying-mining-and-proving-work/).

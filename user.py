@@ -55,7 +55,7 @@ def showhelp(path):
           -s <max-seed>  - generate seeds in the range 0..max-seed (default 100)
           -n <num>       - number of random transactions (default 1)
 
-    """.format(os.path.basename(path), MEMPOOL_ADDRESS))
+    """.format(os.path.basename(path)))
 
 def send(tx, node_addresses):
     success = []

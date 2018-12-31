@@ -7,7 +7,7 @@ BLOCK_REWARD = 1
 MAX_TRANSACTIONS_PER_BLOCK = 5
 NEW_ADDRESS_BALANCE = 1 # the amount that a newly created address gets assigned
 
-# Not used anymore
+# Not used anymore - obsolete
 # LEASE_TIME = 60 # how long the tracker keeps you registered in seconds
 # CHAINDATA_DIR = 'chaindata'
 # MEMPOOL_ADDRESS = "localhost:5100"

@@ -345,10 +345,11 @@ def start(opt, remaining, host, port, active_peers, synchronizer):
         shared_dict["running"] = False
 
 if __name__ == '__main__':
+    import sys
     opt, remaining = getopt.getopt(sys.argv[1:], "hH:p:")
     opt = dict(opt)    
     if "-h" in opt:
-        print(helptext(os.path.basename(argv[0])))
+        print(helptext(os.path.basename(sys.argv[0])))
         sys.exit()
 
     node.chainclass = BlockChain
