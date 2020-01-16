@@ -17,9 +17,11 @@ For transactions to work correctly, you need the additional modules
 * transaction
 * address
 * user
-* transactionnode
+* transactionnode (instead of node)
 
-The third level adds general purpose executable data to this. This is still very much to be done and understood.
+The third level adds general purpose executable data to this (like smart contracts). This is still mostly to be done.
+
+Communication happens through a HTTP-based REST-like API.
 
 ### Configuration ###
 
@@ -37,21 +39,23 @@ The local configuration is in `config.py`. It is a Python module that contains t
 
 ##### Run node.py as a script. This runs a general node that assists in peer discovery and mining.
 
-This will start mining and also tries to discover other nodes and synchronize with them.
+This will start mining and also tries to discover other nodes and synchronize with them. The URL of the node will be displayed.
 
-The nodes operate a full node:
+The nodes operate a full node whose state can be queried through the commands
   
   * /running      - returns running when the node is running
-  * /block(n)     - returns block n in json format
+  * /block(index) - returns block n in json format
   * /blockchain   - returns the blockchain as seen by this peer in json format
   * /chainlength  - returns the chainlength as seen by this peer
 
-and also peer discovery services
+and they also peer discovery services through the commands
 
   * /nodes           - returns a list of URL's of registered miners
-  * /register(url)   - register a url with the tracker
+  * /register(url)   - register a url with the node
 
 Unless the nodes run on the same computer, you have to specify hostnames and ports, call both with -h to see options.
+
+Using the URL of the node, you can directly query the node with a web brower, e.g. `http://localhost:5000/block?index=1`
 
 ##### For transaction processing, run transactionnode.py rather than node.py.
 
@@ -66,7 +70,7 @@ These support the same functionality and network services as node.py nodes, but 
 
 ##### Run user.py to use the network
 
-All services can be directly accessed through http, but this client makes it easier. It provides some additional functionality (as a minimal wallet/addressbook) as well.
+All services can be directly accessed through HTTP, but this client makes it easier. It provides some additional functionality (like a minimal wallet/addressbook) as well.
 
 * send              - send a transaction
 * address           - see public address
@@ -79,17 +83,17 @@ The following are still to be implemented:
 
 ### Objectives ###
 
-* To implement a toy blockchain to understand the concepts in some detail.
+* To implement a simple but fully functional blockchain to understand the concepts in some detail.
 * To provide a base for experimentation with variations and applications of blockchain technology.
-* The networking part (peer discovery, block broadcasting, security of communications, etc) is not the main focus, so this just has a quick 'n' dirty design. 
+* The networking part (peer discovery, block broadcasting, security of communications, etc) is not the main focus. 
 
 ### Dependencies ###
 
-All this runs in Python 3, though Python 2 should work with some minor changes. It uses the non-standard modules flask, ecdsa and dateutil.
+All this runs in Python 3, though Python 2 should work with some minor changes. It uses the non-standard modules `flask`, `ecdsa` and `dateutil`.
 
 ### Contact ###
 
-doetoe@protonmail.com
+doetoe@gmail.com
 
 ### Credits ###
 This is a greatly improved and extended version of what was initially loosely based on [this tutorial](https://bigishdata.com/2017/10/17/write-your-own-blockchain-part-1-creating-storing-syncing-displaying-mining-and-proving-work/).
