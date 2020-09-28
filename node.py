@@ -319,17 +319,17 @@ def get_host_port(opt):
 
     return host, port
 
-def find_peers(opt, remaining, active_peers, synchronizer):
-    synchronizer.update_peers(active_peers, NODE_ADDRESSES + remaining)
+def find_peers(opt, peer_urls, active_peers, synchronizer):
+    synchronizer.update_peers(active_peers, NODE_ADDRESSES + peer_urls)
     if not active_peers:
         print("No active nodes found. Going solo.")    
 
 # Run mining node at specified port, or, if no port is specified, look for
 # port that is free, probably one that has run before if available.
 # It will at the same time start mining and start broadcasting.
-def start(opt, remaining, host, port, active_peers, synchronizer):
+def start(opt, peer_urls, host, port, active_peers, synchronizer):
     synchronizer.init(host, port, shared_dict, active_peers)
-    find_peers(opt, remaining, active_peers, synchronizer)
+    find_peers(opt, peer_urls, active_peers, synchronizer)
     
     shared_dict["running"] = True
     
@@ -346,7 +346,7 @@ def start(opt, remaining, host, port, active_peers, synchronizer):
 
 if __name__ == '__main__':
     import sys
-    opt, remaining = getopt.getopt(sys.argv[1:], "hH:p:")
+    opt, peer_urls = getopt.getopt(sys.argv[1:], "hH:p:")
     opt = dict(opt)    
     if "-h" in opt:
         print(helptext(os.path.basename(sys.argv[0])))
@@ -354,4 +354,4 @@ if __name__ == '__main__':
 
     node.chainclass = BlockChain
     host, port = get_host_port(opt)
-    start(opt, remaining, host, port, active_peers, Synchronizer())
+    start(opt, peer_urls, host, port, active_peers, Synchronizer())

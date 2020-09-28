@@ -17,7 +17,7 @@ For transactions to work correctly, you need the additional modules
 * transaction
 * address
 * user
-* transactionnode (instead of node)
+* transactionnode
 
 The third level adds general purpose executable data to this (like smart contracts). This is still mostly to be done.
 
@@ -59,7 +59,7 @@ Using the URL of the node, you can directly query the node with a web brower, e.
 
 ##### For transaction processing, run transactionnode.py rather than node.py.
 
-These support the same functionality and network services as node.py nodes, but additionally provide mempool services and transaction validation. New services are
+These support the same functionality and network services as node.py nodes (of which they form a subclass), but additionally provide mempool services and transaction validation. New services are
 
 * /pushtx(tx)       - put json describing a transaction
 * /unprocessed      - json of all unprocessed transactions
@@ -93,7 +93,7 @@ All this runs in Python 3, though Python 2 should work with some minor changes. 
 
 ### Contact ###
 
-doetoe@gmail.com
+doetoe@protonmail.com
 
 ### Credits ###
 This is a greatly improved and extended version of what was initially loosely based on [this tutorial](https://bigishdata.com/2017/10/17/write-your-own-blockchain-part-1-creating-storing-syncing-displaying-mining-and-proving-work/).

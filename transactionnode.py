@@ -247,7 +247,7 @@ def get_db_connection(opt, port):
 if __name__ == '__main__':
     # options for transaction database. Take care of the unicity of filenames
     # for different nodes.
-    opt, remaining = getopt.getopt(sys.argv[1:], "hHp:t:d:m:")
+    opt, peer_urls = getopt.getopt(sys.argv[1:], "hHp:t:d:m:")
     opt = dict(opt)
     if "-h" in opt:
         print(transaction_helptext(os.path.basename(sys.argv[0])))
@@ -264,5 +264,5 @@ if __name__ == '__main__':
 
     # Start the node with tracker services and the new transaction services
     # as well as the mining process
-    start(opt, remaining, host, port, active_peers,
+    start(opt, peer_urls, host, port, active_peers,
           TransactionSynchronizer(db_connection, miner_address))

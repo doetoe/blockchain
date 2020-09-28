@@ -18,7 +18,9 @@ import os
 #             sys.stdin = _stdin
 
 class ForkablePdb(pdb.Pdb):
-
+    """To use the debugger in child processes.
+    From https://stackoverflow.com/a/23654936.
+    Usage: ForkablePdb().set_trace()"""
     _original_stdin_fd = sys.stdin.fileno()
     _original_stdin = None
 
